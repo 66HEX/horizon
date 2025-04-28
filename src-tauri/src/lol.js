@@ -13,10 +13,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Create a new directory at the specified path
 /// 
 /// # Arguments
-/// * `path` - The path where the directory should be created.
+/// * `path` - The path where the directory should be created
 /// 
 /// # Returns
-/// Result indicating success or error message.
+/// Result indicating success or error message.....
 #[command]
 pub fn create_directory(path: String) -> Result<(), String> {
     fs::create_dir_all(&path)

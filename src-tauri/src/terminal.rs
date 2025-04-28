@@ -1,9 +1,9 @@
-/// Terminal module for handling terminal sessions and commands
+/// Terminal module for handling terminal sessions and commands.
 use std::sync::{Arc, Mutex};
 use tauri::{command, AppHandle, Window, State, Emitter, Manager};
 use tauri_plugin_shell::{ShellExt, process::{CommandEvent, CommandChild}};
 use std::collections::HashMap;
-use crate::process_tracker::{ProcessTracker, find_child_process};
+use crate::process_tracker::ProcessTracker;
 use sysinfo::Pid;
 use std::fs;
 use serde_json::{self, json};

@@ -1,23 +1,23 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, readDir} from '@tauri-apps/plugin-fs';
 import { join } from '@tauri-apps/api/path';
-import * as nativeFs from './native-fs';
+import { nativeFs, DirectoryItem as NativeDirectoryItem, MatchResult } from './native-fs';
 
 export interface FileInfo {
   id: string;
   path: string;
   name: string;
   content: string;
-  isUnsaved?: boolean;
+  is_unsaved?: boolean;
 }
 
 export interface DirectoryItem {
   name: string;
   path: string;
-  isDirectory: boolean;
+  is_directory: boolean;
   type: 'file' | 'directory';
   children?: DirectoryItem[];
-  needsLoading?: boolean;
+  needs_loading?: boolean;
 }
 
 let fileServiceInstance: FileService | null = null;
@@ -71,7 +71,7 @@ export class FileService {
           path: fileInfo.path,
           name: fileInfo.name,
           content: fileInfo.content,
-          isUnsaved: fileInfo.is_unsaved
+          is_unsaved: fileInfo.is_unsaved
         };
         return this.currentFile;
       } catch (error) {
@@ -88,7 +88,7 @@ export class FileService {
           path: filePath,
           name: fileName,
           content,
-          isUnsaved: false
+          is_unsaved: false
         };
         return this.currentFile;
       }
@@ -141,14 +141,14 @@ export class FileService {
   /**
    * Converts Rust DirectoryItems to our DirectoryItem format
    */
-  private convertRustDirectoryItems(rustItems: nativeFs.DirectoryItem[]): DirectoryItem[] {
+  private convertRustDirectoryItems(rustItems: NativeDirectoryItem[]): DirectoryItem[] {
     return rustItems.map(item => ({
       name: item.name,
       path: item.path,
-      isDirectory: item.is_directory,
+      is_directory: item.is_directory,
       type: item.is_directory ? 'directory' : 'file',
       children: item.children ? this.convertRustDirectoryItems(item.children) : undefined,
-      needsLoading: item.needs_loading
+      needs_loading: item.needs_loading
     }));
   }
 
@@ -182,7 +182,7 @@ export class FileService {
           const item: DirectoryItem = {
             name: entry.name,
             path: entryPath,
-            isDirectory: entry.isDirectory,
+            is_directory: entry.isDirectory,
             type: entry.isDirectory ? 'directory' : 'file'
           };
 
@@ -190,12 +190,12 @@ export class FileService {
             console.log(`Entry ${entry.name} in ${dirPath} identified as directory`);
           }
 
-          if (item.isDirectory) {
+          if (item.is_directory) {
             if (depth < maxInitialDepth) {
               item.children = await this.scanDirectory(item.path, depth + 1);
             } else {
               item.children = [];
-              item.needsLoading = true;
+              item.needs_loading = true;
             }
           }
 
@@ -203,8 +203,8 @@ export class FileService {
         }
 
         return result.sort((a, b) => {
-          if (a.isDirectory && !b.isDirectory) return -1;
-          if (!a.isDirectory && b.isDirectory) return 1;
+          if (a.is_directory && !b.is_directory) return -1;
+          if (!a.is_directory && b.is_directory) return 1;
           return a.name.localeCompare(b.name);
         });
       }
@@ -294,7 +294,7 @@ export class FileService {
           path: fileInfo.path,
           name: fileInfo.name,
           content: fileInfo.content,
-          isUnsaved: fileInfo.is_unsaved
+          is_unsaved: fileInfo.is_unsaved
         };
         return this.currentFile;
       } catch (error) {
@@ -313,7 +313,7 @@ export class FileService {
           path: filePath,
           name: fileName,
           content,
-          isUnsaved: false
+          is_unsaved: false
         };
         return this.currentFile;
       }
@@ -356,24 +356,14 @@ async saveFile(content: string, saveAs: boolean = false): Promise<FileInfo | nul
     await nativeFs.writeToFile(filePath, cleanContent);
     
     try {
-      await nativeFs.readFile(filePath);
-    } catch (error) {
-      console.error('[FileService] Error verifying saved content:', error);
-    }
-    
-    try {
       const fileInfo = await nativeFs.getFileInfo(filePath);
-      const actualContent = cleanContent;
-      
       const updatedFile: FileInfo = {
         id: saveAs ? fileInfo.id : (this.currentFile?.id || fileInfo.id),
         path: fileInfo.path,
         name: fileInfo.name,
-        content: actualContent,
-        isUnsaved: false
+        content: cleanContent,
+        is_unsaved: false
       };
-      
-      console.log(`[FileService] Returning updated file info with content length: ${updatedFile.content.length}`);
       
       this.currentFile = updatedFile;
       return updatedFile;
@@ -390,10 +380,8 @@ async saveFile(content: string, saveAs: boolean = false): Promise<FileInfo | nul
         path: filePath,
         name: fileName,
         content: cleanContent,
-        isUnsaved: false
+        is_unsaved: false
       };
-      
-      console.log(`[FileService] Returning file info from fallback with content length: ${updatedFile.content.length}`);
       
       this.currentFile = updatedFile;
       return updatedFile;
@@ -433,14 +421,14 @@ async saveFile(content: string, saveAs: boolean = false): Promise<FileInfo | nul
    * @param items - Tablica elementów do przekonwertowania
    * @returns Przekonwertowana tablica DirectoryItem
    */
-  private mapNativeFsItems(items: nativeFs.DirectoryItem[]): DirectoryItem[] {
+  private mapNativeFsItems(items: DirectoryItem[]): DirectoryItem[] {
     return items.map(item => ({
       name: item.name,
       path: item.path,
-      isDirectory: item.is_directory,
+      is_directory: item.is_directory,
       type: item.is_directory ? 'directory' : 'file',
       children: item.children ? this.mapNativeFsItems(item.children) : undefined,
-      needsLoading: item.needs_loading
+      needs_loading: item.needs_loading
     }));
   }
 
@@ -480,7 +468,7 @@ async saveFile(content: string, saveAs: boolean = false): Promise<FileInfo | nul
     ignoreCase: boolean = true,
     includePatterns?: string[],
     excludePatterns?: string[]
-  ): Promise<nativeFs.MatchResult[]> {
+  ): Promise<MatchResult[]> {
     if (!query || !this.currentDirectory) {
       return [];
     }

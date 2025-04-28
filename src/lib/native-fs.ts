@@ -1,286 +1,316 @@
-/**
- * Native file system operations using Rust backend
- */
-import { invoke } from '@tauri-apps/api/core';
+import { readTextFile, readDir, writeTextFile } from '@tauri-apps/plugin-fs';
+import { join } from '@tauri-apps/api/path';
 
-/**
- * Directory entry returned from list_directory function
- */
-export interface DirEntry {
-  name: string;
-  path: string;
-  is_directory: boolean;
-  size: number;
-}
-
-/**
- * File information structure
- */
 export interface FileInfo {
   id: string;
   path: string;
   name: string;
   content: string;
-  is_unsaved: boolean;
+  is_unsaved?: boolean;
 }
 
-/**
- * Directory item structure
- */
 export interface DirectoryItem {
   name: string;
   path: string;
   is_directory: boolean;
-  item_type: string;
+  type: 'file' | 'directory';
   children?: DirectoryItem[];
   needs_loading?: boolean;
-  isDirectory: boolean;
-  type: string;
 }
 
-/**
- * Search match result with context information
- */
 export interface MatchResult {
-  path: string;
-  name: string;
-  line_number: number;
-  preview_text: string;
-  is_directory: boolean;
+  file: DirectoryItem;
+  line: number;
+  content: string;
 }
 
-/**
- * Create a new directory at the specified path
- * @param path - Path where the directory should be created
- * @returns Promise that resolves when operation completes
- */
-export async function createDirectory(path: string): Promise<void> {
-  return invoke('create_directory', { path });
+interface ElectronAPI {
+  checkPath(path: string): Promise<void>;
+  getPathStats(path: string): Promise<{ isDirectory: boolean }>;
+  readFile(path: string): Promise<string>;
+  writeFile(path: string, content: string): Promise<void>;
+  deletePath(path: string, recursive: boolean): Promise<void>;
+  renamePath(oldPath: string, newPath: string): Promise<void>;
+  createDirectory(path: string): Promise<void>;
 }
 
-/**
- * Create a new file with the given content
- * @param path - Path where the file should be created
- * @param content - Content to write to the file
- * @returns Promise that resolves when operation completes
- */
-export async function createFile(path: string, content: string): Promise<void> {
-  return invoke('create_file', { path, content });
-}
-
-/**
- * Read the content of a file
- * @param path - Path of the file to read
- * @returns Promise that resolves to the file content
- */
-export async function readFile(path: string): Promise<string> {
-  return invoke('read_file', { path });
-}
-
-/**
- * Delete a file or directory
- * @param path - Path to delete
- * @param recursive - Whether to delete directories recursively
- * @returns Promise that resolves when operation completes
- */
-export async function deletePath(path: string, recursive: boolean = true): Promise<void> {
-  return invoke('delete_path', { path, recursive });
-}
-
-/**
- * Rename a file or directory
- * @param fromPath - Current path
- * @param toPath - New path
- * @returns Promise that resolves when operation completes
- */
-export async function renamePath(fromPath: string, toPath: string): Promise<void> {
-  return invoke('rename_path', { fromPath, toPath });
-}
-
-/**
- * Check if a path exists
- * @param path - Path to check
- * @returns Promise that resolves to true if the path exists, false otherwise
- */
-export async function pathExists(path: string): Promise<boolean> {
-  return invoke('path_exists', { path });
-}
-
-/**
- * Check if a path is a directory
- * @param path - Path to check
- * @returns Promise that resolves to true if the path is a directory, false otherwise
- */
-export async function isDirectory(path: string): Promise<boolean> {
-  return invoke('is_directory', { path });
-}
-
-/**
- * Copy a file
- * @param fromPath - Source path
- * @param toPath - Destination path
- * @returns Promise that resolves when operation completes
- */
-export async function copyFile(fromPath: string, toPath: string): Promise<void> {
-  return invoke('copy_file', { fromPath, toPath });
-}
-
-/**
- * List directory contents
- * @param path - Directory path to list
- * @returns Promise that resolves to an array of directory entries
- */
-export async function listDirectory(path: string): Promise<DirEntry[]> {
-  return invoke('list_directory', { path });
-}
-
-/**
- * Append text to a file
- * @param path - Path of the file
- * @param content - Content to append
- * @returns Promise that resolves when operation completes
- */
-export async function appendToFile(path: string, content: string): Promise<void> {
-  return invoke('append_to_file', { path, content });
-}
-
-/**
- * Write text to a file, overwriting existing content
- * @param path - Path of the file
- * @param content - Content to write
- * @returns Promise that resolves when operation completes
- */
-export async function writeToFile(path: string, content: string): Promise<void> {
-  console.log(`[native-fs] writeToFile called for path: ${path}`);
-  console.log(`[native-fs] Content type: ${typeof content}, length: ${content.length}`);
-  console.log(`[native-fs] Content preview: "${content.substring(0, 50)}..."`);
-  
-  // Extra validation to ensure we're passing a valid string
-  if (typeof content !== 'string') {
-    console.error(`[native-fs] Invalid content type: ${typeof content}`);
-    content = String(content);
-    console.log(`[native-fs] Converted content length: ${content.length}`);
+declare global {
+  interface Window {
+    electronAPI: ElectronAPI;
   }
-  
-  // Remove null characters if any
-  if (content.includes('\0')) {
-    console.warn(`[native-fs] Content contains null characters, cleaning...`);
-    content = content.replace(/\0/g, '');
-    console.log(`[native-fs] Cleaned content length: ${content.length}`);
+}
+
+export interface NativeFs {
+  getFileInfo(filePath: string): Promise<FileInfo>;
+  scanDirectory(dirPath: string, depth?: number, maxDepth?: number): Promise<DirectoryItem[]>;
+  readFile(filePath: string): Promise<string>;
+  writeToFile(filePath: string, content: string): Promise<void>;
+  isDirectory(path: string): Promise<boolean>;
+  pathExists(path: string): Promise<boolean>;
+  createFile(path: string, content: string): Promise<void>;
+  deletePath(path: string, recursive: boolean): Promise<void>;
+  renamePath(oldPath: string, newPath: string): Promise<void>;
+  createDirectory(path: string): Promise<void>;
+  searchFileContents(query: string, dirPath: string, maxResults?: number): Promise<DirectoryItem[]>;
+  searchFileContentsAdvanced(
+    query: string,
+    dirPath: string,
+    maxResults?: number,
+    ignoreCase?: boolean,
+    includePatterns?: string[],
+    excludePatterns?: string[]
+  ): Promise<MatchResult[]>;
+  searchFilesByName(query: string, dirPath: string, maxResults?: number): Promise<DirectoryItem[]>;
+  searchFilesByNameAdvanced(
+    query: string,
+    dirPath: string,
+    maxResults?: number,
+    includePatterns?: string[],
+    excludePatterns?: string[]
+  ): Promise<DirectoryItem[]>;
+  isImageFile(filePath: string): Promise<boolean>;
+  isAudioFile(filePath: string): Promise<boolean>;
+}
+
+export const nativeFs: NativeFs = {
+  async getFileInfo(filePath: string): Promise<FileInfo> {
+    const content = await readTextFile(filePath);
+    const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || 'unknown';
+    const id = `${filePath}-${Date.now()}-${Math.random().toString(36).substring(2, 12)}`;
+    
+    return {
+      id,
+      path: filePath,
+      name: fileName,
+      content,
+      is_unsaved: false
+    };
+  },
+
+  async scanDirectory(dirPath: string, depth: number = 0, maxDepth: number = 2): Promise<DirectoryItem[]> {
+    const entries = await readDir(dirPath);
+    const result: DirectoryItem[] = [];
+
+    for (const entry of entries) {
+      const entryPath = await join(dirPath, entry.name);
+      const item: DirectoryItem = {
+        name: entry.name,
+        path: entryPath,
+        is_directory: entry.isDirectory,
+        type: entry.isDirectory ? 'directory' : 'file'
+      };
+
+      if (entry.isDirectory && depth < maxDepth) {
+        item.children = await nativeFs.scanDirectory(entryPath, depth + 1, maxDepth);
+      } else if (entry.isDirectory) {
+        item.children = [];
+        item.needs_loading = true;
+      }
+
+      result.push(item);
+    }
+
+    return result.sort((a, b) => {
+      if (a.is_directory && !b.is_directory) return -1;
+      if (!a.is_directory && b.is_directory) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  },
+
+  async readFile(filePath: string): Promise<string> {
+    return await readTextFile(filePath);
+  },
+
+  async writeToFile(filePath: string, content: string): Promise<void> {
+    await writeTextFile(filePath, content);
+  },
+
+  async isDirectory(path: string): Promise<boolean> {
+    try {
+      const stats = await window.electronAPI.getPathStats(path);
+      return stats.isDirectory;
+    } catch {
+      return false;
+    }
+  },
+
+  async pathExists(path: string): Promise<boolean> {
+    try {
+      await window.electronAPI.checkPath(path);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  async createFile(path: string, content: string): Promise<void> {
+    await window.electronAPI.writeFile(path, content);
+  },
+
+  async deletePath(path: string, recursive: boolean = false): Promise<void> {
+    await window.electronAPI.deletePath(path, recursive);
+  },
+
+  async renamePath(oldPath: string, newPath: string): Promise<void> {
+    await window.electronAPI.renamePath(oldPath, newPath);
+  },
+
+  async createDirectory(path: string): Promise<void> {
+    await window.electronAPI.createDirectory(path);
+  },
+
+  async searchFileContents(query: string, dirPath: string, maxResults: number = 20): Promise<DirectoryItem[]> {
+    const results: DirectoryItem[] = [];
+    const entries = await readDir(dirPath);
+
+    for (const entry of entries) {
+      if (results.length >= maxResults) break;
+
+      const entryPath = await join(dirPath, entry.name);
+      if (!entry.isDirectory) {
+        try {
+          const content = await readTextFile(entryPath);
+          if (content.toLowerCase().includes(query.toLowerCase())) {
+            results.push({
+              name: entry.name,
+              path: entryPath,
+              is_directory: false,
+              type: 'file'
+            });
+          }
+        } catch (error) {
+          console.error(`Error reading file ${entryPath}:`, error);
+        }
+      }
+    }
+
+    return results;
+  },
+
+  async searchFileContentsAdvanced(
+    query: string,
+    dirPath: string,
+    maxResults: number = 20,
+    ignoreCase: boolean = true,
+    includePatterns?: string[],
+    excludePatterns?: string[]
+  ): Promise<MatchResult[]> {
+    const results: MatchResult[] = [];
+    const entries = await readDir(dirPath);
+
+    for (const entry of entries) {
+      if (results.length >= maxResults) break;
+
+      const entryPath = await join(dirPath, entry.name);
+      if (!entry.isDirectory) {
+        // Check if file matches include/exclude patterns
+        const fileName = entry.name.toLowerCase();
+        if (includePatterns && !includePatterns.some(pattern => fileName.endsWith(pattern.toLowerCase()))) {
+          continue;
+        }
+        if (excludePatterns && excludePatterns.some(pattern => fileName.endsWith(pattern.toLowerCase()))) {
+          continue;
+        }
+
+        try {
+          const content = await readTextFile(entryPath);
+          const lines = content.split('\n');
+          const searchQuery = ignoreCase ? query.toLowerCase() : query;
+
+          for (let i = 0; i < lines.length; i++) {
+            const line = ignoreCase ? lines[i].toLowerCase() : lines[i];
+            if (line.includes(searchQuery)) {
+              results.push({
+                file: {
+                  name: entry.name,
+                  path: entryPath,
+                  is_directory: false,
+                  type: 'file'
+                },
+                line: i + 1,
+                content: lines[i]
+              });
+              if (results.length >= maxResults) break;
+            }
+          }
+        } catch (error) {
+          console.error(`Error reading file ${entryPath}:`, error);
+        }
+      }
+    }
+
+    return results;
+  },
+
+  async searchFilesByName(query: string, dirPath: string, maxResults: number = 20): Promise<DirectoryItem[]> {
+    const results: DirectoryItem[] = [];
+    const entries = await readDir(dirPath);
+    const searchQuery = query.toLowerCase();
+
+    for (const entry of entries) {
+      if (results.length >= maxResults) break;
+
+      const entryPath = await join(dirPath, entry.name);
+      if (entry.name.toLowerCase().includes(searchQuery)) {
+        results.push({
+          name: entry.name,
+          path: entryPath,
+          is_directory: entry.isDirectory,
+          type: entry.isDirectory ? 'directory' : 'file'
+        });
+      }
+    }
+
+    return results;
+  },
+
+  async searchFilesByNameAdvanced(
+    query: string,
+    dirPath: string,
+    maxResults: number = 20,
+    includePatterns?: string[],
+    excludePatterns?: string[]
+  ): Promise<DirectoryItem[]> {
+    const results: DirectoryItem[] = [];
+    const entries = await readDir(dirPath);
+    const searchQuery = query.toLowerCase();
+
+    for (const entry of entries) {
+      if (results.length >= maxResults) break;
+
+      const entryPath = await join(dirPath, entry.name);
+      const fileName = entry.name.toLowerCase();
+
+      // Check if file matches include/exclude patterns
+      if (includePatterns && !includePatterns.some(pattern => fileName.endsWith(pattern.toLowerCase()))) {
+        continue;
+      }
+      if (excludePatterns && excludePatterns.some(pattern => fileName.endsWith(pattern.toLowerCase()))) {
+        continue;
+      }
+
+      if (fileName.includes(searchQuery)) {
+        results.push({
+          name: entry.name,
+          path: entryPath,
+          is_directory: entry.isDirectory,
+          type: entry.isDirectory ? 'directory' : 'file'
+        });
+      }
+    }
+
+    return results;
+  },
+
+  async isImageFile(filePath: string): Promise<boolean> {
+    const extensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp'];
+    const path = filePath.toLowerCase();
+    return extensions.some(ext => path.endsWith(ext));
+  },
+
+  async isAudioFile(filePath: string): Promise<boolean> {
+    const extensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'];
+    const path = filePath.toLowerCase();
+    return extensions.some(ext => path.endsWith(ext));
   }
-  
-  return invoke('write_to_file', { path, content });
-}
-
-/**
- * Get file information
- * @param path - Path of the file
- * @returns Promise that resolves to file information
- */
-export async function getFileInfo(path: string): Promise<FileInfo> {
-  return invoke('get_file_info', { path });
-}
-
-/**
- * Scan a directory recursively
- * @param dirPath - Directory path to scan
- * @param depth - Current depth (default: 0)
- * @param maxDepth - Maximum depth to scan before lazy loading (default: 2)
- * @returns Promise that resolves to directory structure
- */
-export async function scanDirectory(dirPath: string, depth: number = 0, maxDepth: number = 2): Promise<DirectoryItem[]> {
-  return invoke('scan_directory', { dirPath, depth, maxDepth });
-}
-
-/**
- * Check if a file is an image
- * @param path - Path of the file
- * @returns Promise that resolves to true if the file is an image
- */
-export async function isImageFile(path: string): Promise<boolean> {
-  return invoke('is_image_file', { path });
-}
-
-/**
- * Check if a file is an audio file
- * @param path - Path of the file
- * @returns Promise that resolves to true if the file is an audio file
- */
-export async function isAudioFile(path: string): Promise<boolean> {
-  return invoke('is_audio_file', { path });
-}
-
-/**
- * Search file contents
- * @param query - Search query
- * @param dirPath - Directory path to search in
- * @param maxResults - Maximum number of results (default: 20)
- * @returns Promise that resolves to items containing the query
- */
-export async function searchFileContents(query: string, dirPath: string, maxResults: number = 20): Promise<DirectoryItem[]> {
-  return invoke('search_file_contents', { query, dirPath, maxResults });
-}
-
-/**
- * Advanced search for file contents with regex and filtering options
- * @param query - Search query (regex supported)
- * @param dirPath - Directory path to search in
- * @param maxResults - Maximum number of results (default: 20)
- * @param ignoreCase - Whether to ignore case in search (default: true)
- * @param includePatterns - Optional glob patterns to include
- * @param excludePatterns - Optional glob patterns to exclude
- * @returns Promise that resolves to match results with context
- */
-export async function searchFileContentsAdvanced(
-  query: string, 
-  dirPath: string, 
-  maxResults: number = 20,
-  ignoreCase: boolean = true,
-  includePatterns?: string[],
-  excludePatterns?: string[]
-): Promise<MatchResult[]> {
-  return invoke('search_file_contents_advanced', { 
-    query, 
-    dirPath, 
-    maxResults,
-    ignoreCase,
-    includePatterns,
-    excludePatterns
-  });
-}
-
-/**
- * Search files by name
- * @param query - Search query
- * @param dirPath - Directory path to search in
- * @param maxResults - Maximum number of results (default: 20)
- * @returns Promise that resolves to items matching the query
- */
-export async function searchFilesByName(query: string, dirPath: string, maxResults: number = 20): Promise<DirectoryItem[]> {
-  return invoke('search_files_by_name', { query, dirPath, maxResults });
-}
-
-/**
- * Advanced search for files by name with filtering options
- * @param query - Search query
- * @param dirPath - Directory path to search in
- * @param maxResults - Maximum number of results (default: 20)
- * @param includePatterns - Optional glob patterns to include
- * @param excludePatterns - Optional glob patterns to exclude
- * @returns Promise that resolves to items matching the query
- */
-export async function searchFilesByNameAdvanced(
-  query: string,
-  dirPath: string,
-  maxResults: number = 20,
-  includePatterns?: string[],
-  excludePatterns?: string[]
-): Promise<DirectoryItem[]> {
-  return invoke('search_files_by_name_advanced', { 
-    query, 
-    dirPath, 
-    maxResults,
-    includePatterns,
-    excludePatterns
-  });
-} 
+};

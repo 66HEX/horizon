@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { FileService, FileInfo, DirectoryItem } from './file-service';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { dirname, basename, join } from '@tauri-apps/api/path';
-import * as nativeFs from './native-fs';
+import { nativeFs } from './native-fs';
 
 // Audio Store
 interface AudioPlayer {
@@ -125,7 +125,7 @@ export const useFileStore = create<FileState>((set, get) => {
       path: file.path,
       name: file.name,
       content: file.content,
-      isUnsaved: file.isUnsaved || false
+      is_unsaved: file.is_unsaved || false
     };
     
     if (existingFileIndex === -1) {
@@ -214,60 +214,59 @@ export const useFileStore = create<FileState>((set, get) => {
       }
     },
 
-
-saveFile: async (content) => {
-  try {
-    const { currentFile } = get();
-    if (!currentFile) {
-      return null;
-    }
-    
-    if (content.trim().length === 0) {
-      console.warn('Warning: Attempting to save empty content');
-      
-      const editorContainer = document.querySelector('[data-editor-container]') as any;
-      if (editorContainer && editorContainer.__currentContent) {
-        content = editorContainer.__currentContent;
-      } 
-      else if (currentFile.content && currentFile.content.length > 0) {
-        content = currentFile.content;
-      }
-      else if (editorContainer) {
-        const editorContent = editorContainer.querySelector('.cm-content')?.textContent;
-        if (editorContent && editorContent.length > 0) {
-          content = editorContent;
+    saveFile: async (content) => {
+      try {
+        const { currentFile } = get();
+        if (!currentFile) {
+          return null;
         }
-      }
-    }
-    
-    const file = await fileService.saveFile(content, false);
-    
-    if (file) {
-      set((state) => {
-        const updatedOpenFiles = state.openFiles.map(f =>
-          f.path === file.path ? {
-            ...f,
-            content: content,
-            isUnsaved: false
-          } : f
-        );
         
-        return {
-          openFiles: updatedOpenFiles,
-          currentFile: {
-            ...file,
-            content: content
+        if (content.trim().length === 0) {
+          console.warn('Warning: Attempting to save empty content');
+          
+          const editorContainer = document.querySelector('[data-editor-container]') as any;
+          if (editorContainer && editorContainer.__currentContent) {
+            content = editorContainer.__currentContent;
+          } 
+          else if (currentFile.content && currentFile.content.length > 0) {
+            content = currentFile.content;
           }
-        };
-      });
-    }
-    
-    return file;
-  } catch (error) {
-    console.error('Error in saveFile:', error);
-    return null;
-  }
-},
+          else if (editorContainer) {
+            const editorContent = editorContainer.querySelector('.cm-content')?.textContent;
+            if (editorContent && editorContent.length > 0) {
+              content = editorContent;
+            }
+          }
+        }
+        
+        const file = await fileService.saveFile(content, false);
+        
+        if (file) {
+          set((state) => {
+            const updatedOpenFiles = state.openFiles.map(f =>
+              f.path === file.path ? {
+                ...f,
+                content: content,
+                is_unsaved: false
+              } : f
+            );
+            
+            return {
+              openFiles: updatedOpenFiles,
+              currentFile: {
+                ...file,
+                content: content
+              }
+            };
+          });
+        }
+        
+        return file;
+      } catch (error) {
+        console.error('Error in saveFile:', error);
+        return null;
+      }
+    },
 
     saveFileAs: async (content) => {
       try {
@@ -281,43 +280,42 @@ saveFile: async (content) => {
       }
     },
 
+    updateFileContent: (content) => {
+      const { currentFile } = get();
+      if (!currentFile) return;
 
-updateFileContent: (content) => {
-  const { currentFile } = get();
-  if (!currentFile) return;
+      const updatedFile: FileInfo = {
+        id: currentFile.id,
+        path: currentFile.path,
+        name: currentFile.name,
+        content: content,
+        is_unsaved: true
+      };
 
-  const updatedFile: FileInfo = {
-    id: currentFile.id,
-    path: currentFile.path,
-    name: currentFile.name,
-    content: content,
-    isUnsaved: true
-  };
-
-  set((state) => {
-    const fileIndex = state.openFiles.findIndex(f => f.path === currentFile.path);
-    
-    if (fileIndex !== -1) {
-      const newOpenFiles = [...state.openFiles];
-      newOpenFiles[fileIndex] = updatedFile;
+      set((state) => {
+        const fileIndex = state.openFiles.findIndex(f => f.path === currentFile.path);
+        
+        if (fileIndex !== -1) {
+          const newOpenFiles = [...state.openFiles];
+          newOpenFiles[fileIndex] = updatedFile;
+          
+          return {
+            openFiles: newOpenFiles,
+            currentFile: updatedFile
+          };
+        } else {
+          return {
+            openFiles: [...state.openFiles, updatedFile],
+            currentFile: updatedFile
+          };
+        }
+      });
       
-      return {
-        openFiles: newOpenFiles,
-        currentFile: updatedFile
-      };
-    } else {
-      return {
-        openFiles: [...state.openFiles, updatedFile],
-        currentFile: updatedFile
-      };
-    }
-  });
-  
-  const editorContainer = document.querySelector('[data-editor-container]');
-  if (editorContainer) {
-    (editorContainer as any).__currentContent = content;
-  }
-},
+      const editorContainer = document.querySelector('[data-editor-container]');
+      if (editorContainer) {
+        (editorContainer as any).__currentContent = content;
+      }
+    },
 
     searchFiles: async (query) => {
       return fileService.searchFiles(query);
@@ -350,7 +348,7 @@ updateFileContent: (content) => {
                   return {
                     ...currentItem,
                     children: contents,
-                    needsLoading: false
+                    needs_loading: false
                   };
                 }
 
@@ -485,7 +483,7 @@ updateFileContent: (content) => {
                     return {
                       ...currentItem,
                       children: parentContents,
-                      needsLoading: false
+                      needs_loading: false
                     };
                   }
 
@@ -522,7 +520,7 @@ updateFileContent: (content) => {
                           return {
                             ...currentItem,
                             children: sourceContents,
-                            needsLoading: false
+                            needs_loading: false
                           };
                         }
 
@@ -619,7 +617,7 @@ updateFileContent: (content) => {
                     return {
                       ...currentItem,
                       children: parentContents,
-                      needsLoading: false
+                      needs_loading: false
                     };
                   }
 
@@ -654,7 +652,7 @@ updateFileContent: (content) => {
                   path: newPath,
                   name: newName,
                   content: f.content,
-                  isUnsaved: f.isUnsaved
+                  is_unsaved: f.is_unsaved
                 };
               }
               return { ...f };
@@ -666,7 +664,7 @@ updateFileContent: (content) => {
                   path: newPath,
                   name: newName,
                   content: currentFile.content,
-                  isUnsaved: currentFile.isUnsaved
+                  is_unsaved: currentFile.is_unsaved
                 }
               : currentFile;
             
@@ -728,7 +726,7 @@ updateFileContent: (content) => {
                     return {
                       ...currentItem,
                       children: parentContents,
-                      needsLoading: false
+                      needs_loading: false
                     };
                   }
 
@@ -842,7 +840,7 @@ updateFileContent: (content) => {
                     return {
                       ...currentItem,
                       children: parentContents,
-                      needsLoading: false
+                      needs_loading: false
                     };
                   }
 
@@ -887,10 +885,10 @@ updateFileContent: (content) => {
                 return items.map((currentItem) => {
                   if (currentItem.path === path) {
                     const updatedContents = parentContents.map(child => {
-                      if (child.path === folderPath && child.isDirectory) {
+                      if (child.path === folderPath && child.is_directory) {
                         return {
                           ...child,
-                          needsLoading: false,
+                          needs_loading: false,
                           children: []
                         };
                       }
@@ -900,7 +898,7 @@ updateFileContent: (content) => {
                         return {
                           ...child,
                           children: existingChild.children,
-                          needsLoading: existingChild.needsLoading
+                          needs_loading: existingChild.needs_loading
                         };
                       }
                       
@@ -910,7 +908,7 @@ updateFileContent: (content) => {
                     return {
                       ...currentItem,
                       children: updatedContents,
-                      needsLoading: false
+                      needs_loading: false
                     };
                   }
 
@@ -972,14 +970,14 @@ updateFileContent: (content) => {
               return newItems.map(newItem => {
                 const oldItem = oldItems.find(item => item.path === newItem.path);
                 
-                if (oldItem && newItem.isDirectory && oldItem.isDirectory) {
-                  if (oldItem.children && !oldItem.needsLoading) {
+                if (oldItem && newItem.is_directory && oldItem.is_directory) {
+                  if (oldItem.children && !oldItem.needs_loading) {
                     return {
                       ...newItem,
                       children: oldItem.children.length > 0 ? 
                         mergeStructure(newItem.children || [], oldItem.children) : 
                         newItem.children,
-                      needsLoading: false 
+                      needs_loading: false 
                     };
                   }
                 }
