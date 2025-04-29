@@ -16,6 +16,7 @@ export type DiagnosticItem = {
     start: { line: number; character: number };
     end: { line: number; character: number };
   };
+  filePath: string;
 };
 
 export type HoverInfo = {
@@ -721,7 +722,8 @@ class LspWebSocketClient {
           line: item.range?.end?.line || 0,
           character: item.range?.end?.character || 0
         }
-      }
+      },
+      filePath: item.filePath || ''
     }));
   }
   
@@ -1001,7 +1003,7 @@ export const useLspStore = create<LspState>((set, get) => ({
       return [];
     }
     
-    return diagnostics;
+    return diagnostics.filter(d => d.filePath === filePath);
   },
   
   getHoverInfo: async (filePath, position) => {
@@ -1032,15 +1034,18 @@ export const useLspStore = create<LspState>((set, get) => ({
             formattedContents: formattedData
           };
         } catch (formattingError) {
-          console.error('Błąd podczas formatowania hover:', formattingError);
+          console.error('Error formatting hover data:', formattingError);
           return { contents: response.payload.contents };
         }
       } else if (response.type === 'Error') {
-        throw new Error(response.payload.message);
+        console.error('Error getting hover info:', response.payload.message);
+        return null;
       } else {
-        throw new Error('Invalid response type');
+        console.error('Invalid response type for hover request');
+        return null;
       }
     } catch (error) {
+      console.error('Failed to get hover info:', error);
       set({ error: `Failed to get hover info: ${error}` });
       return null;
     }

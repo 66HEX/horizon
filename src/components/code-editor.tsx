@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import { EditorState, StateEffect } from "@codemirror/state"
 import { javascript } from "@codemirror/lang-javascript"
 import { cn } from "@/lib/utils"
@@ -255,90 +255,45 @@ export function CodeEditor({
   onSave,
   className,
 }: CodeEditorProps) {
-  const prevPropsRef = useRef<CodeEditorProps>({
-    initialValue: "",
-    language: "",
-    readOnly: false,
-  });
-  
-  const renderCount = useRef(0);
-  renderCount.current += 1;
-  
   const editorViewRef = useRef<EditorView | null>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
-  const initialValueRef = useRef(initialValue);
-  const onChangeRef = useRef(onChange);
-  const onSaveRef = useRef(onSave);
-  const [currentInitialValue, setCurrentInitialValue] = useState(initialValue);
-  const didMountRef = useRef(false);
-  const cleanupStartedRef = useRef(false);
+  const isInitializedRef = useRef(false);
+  const lastContentRef = useRef(initialValue);
   
   useEffect(() => {
-    onChangeRef.current = onChange;
-    onSaveRef.current = onSave;
-  }, [onChange, onSave]);
-  
-  useEffect(() => {
-    prevPropsRef.current = {
-      initialValue,
-      language,
-      readOnly,
-      onChange,
-      onSave,
-    };
-  });
-
-  useEffect(() => {
-    if (cleanupStartedRef.current) return;
-    
-    if (initialValue !== currentInitialValue) {
-      setCurrentInitialValue(initialValue);
-      initialValueRef.current = initialValue;
+    if (editorContainerRef.current && !editorViewRef.current && !isInitializedRef.current) {
+      isInitializedRef.current = true;
       
-      if (editorViewRef.current) {
-        const currentContent = editorViewRef.current.state.doc.toString();
-        
-        if (currentContent !== initialValue) {
-          editorViewRef.current.dispatch({
-            changes: {
-              from: 0,
-              to: currentContent.length,
-              insert: initialValue,
-            },
-          });
-        }
-      }
-    }
-  }, [initialValue, currentInitialValue]);
-
-  useEffect(() => {
-    if (cleanupStartedRef.current) return;
-    
-    if (editorViewRef.current && didMountRef.current) {
-      editorViewRef.current.focus();
-    }
-  }, [editorViewRef.current]);
-
-  useEffect(() => {
-    cleanupStartedRef.current = false;
-    
-    didMountRef.current = true;
-    
-    if (editorContainerRef.current && !editorViewRef.current) {
       const extensions = getEditorExtensions({
         language,
         readOnly,
         onChange: (content) => {
-          onChangeRef.current?.(content);
+          if (content !== lastContentRef.current) {
+            lastContentRef.current = content;
+            onChange?.(content);
+          }
         },
         onSave: () => {
-          onSaveRef.current?.();
+          onSave?.();
         },
       });
 
       const startState = EditorState.create({
-        doc: initialValue,
-        extensions,
+        doc: initialValue || '',
+        extensions: [
+          ...extensions,
+          EditorView.editable.of(!readOnly),
+          EditorView.lineWrapping,
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged) {
+              const content = update.state.doc.toString();
+              if (content !== lastContentRef.current) {
+                lastContentRef.current = content;
+                onChange?.(content);
+              }
+            }
+          }),
+        ],
       });
 
       const view = new EditorView({
@@ -348,40 +303,54 @@ export function CodeEditor({
 
       editorViewRef.current = view;
     }
-    
+
     return () => {
-      cleanupStartedRef.current = true;
-      
       if (editorViewRef.current) {
         editorViewRef.current.destroy();
         editorViewRef.current = null;
+        isInitializedRef.current = false;
       }
     };
   }, []);
-  
+
   useEffect(() => {
-    if (cleanupStartedRef.current) return;
-    
-    if (!didMountRef.current || !editorViewRef.current) return;
-    
-    const view = editorViewRef.current;
-    
-    if (prevPropsRef.current.language !== language || 
-        prevPropsRef.current.readOnly !== readOnly) {
-      
-      const newExtensions = getEditorExtensions({
+    if (editorViewRef.current && isInitializedRef.current) {
+      const currentContent = editorViewRef.current.state.doc.toString();
+      if (currentContent !== initialValue) {
+        lastContentRef.current = initialValue;
+        editorViewRef.current.dispatch({
+          changes: {
+            from: 0,
+            to: currentContent.length,
+            insert: initialValue || '',
+          },
+        });
+      }
+    }
+  }, [initialValue]);
+
+  useEffect(() => {
+    if (editorViewRef.current && isInitializedRef.current) {
+      const extensions = getEditorExtensions({
         language,
         readOnly,
         onChange: (content) => {
-          onChangeRef.current?.(content);
+          if (content !== lastContentRef.current) {
+            lastContentRef.current = content;
+            onChange?.(content);
+          }
         },
         onSave: () => {
-          onSaveRef.current?.();
+          onSave?.();
         },
       });
 
-      view.dispatch({
-        effects: StateEffect.reconfigure.of(newExtensions),
+      editorViewRef.current.dispatch({
+        effects: StateEffect.reconfigure.of([
+          ...extensions,
+          EditorView.editable.of(!readOnly),
+          EditorView.lineWrapping,
+        ]),
       });
     }
   }, [language, readOnly]);
@@ -432,5 +401,5 @@ export function CodeEditor({
         </ScrollArea>
       </div>
     </div>
-  )
+  );
 } 

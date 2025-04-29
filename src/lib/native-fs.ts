@@ -6,16 +6,16 @@ export interface FileInfo {
   path: string;
   name: string;
   content: string;
-  is_unsaved?: boolean;
+  isUnsaved?: boolean;
 }
 
 export interface DirectoryItem {
   name: string;
   path: string;
-  is_directory: boolean;
+  isDirectory: boolean;
   type: 'file' | 'directory';
   children?: DirectoryItem[];
-  needs_loading?: boolean;
+  needsLoading?: boolean;
 }
 
 export interface MatchResult {
@@ -83,7 +83,7 @@ export const nativeFs: NativeFs = {
       path: filePath,
       name: fileName,
       content,
-      is_unsaved: false
+      isUnsaved: false
     };
   },
 
@@ -96,7 +96,7 @@ export const nativeFs: NativeFs = {
       const item: DirectoryItem = {
         name: entry.name,
         path: entryPath,
-        is_directory: entry.isDirectory,
+        isDirectory: entry.isDirectory,
         type: entry.isDirectory ? 'directory' : 'file'
       };
 
@@ -104,15 +104,15 @@ export const nativeFs: NativeFs = {
         item.children = await nativeFs.scanDirectory(entryPath, depth + 1, maxDepth);
       } else if (entry.isDirectory) {
         item.children = [];
-        item.needs_loading = true;
+        item.needsLoading = true;
       }
 
       result.push(item);
     }
 
     return result.sort((a, b) => {
-      if (a.is_directory && !b.is_directory) return -1;
-      if (!a.is_directory && b.is_directory) return 1;
+      if (a.isDirectory && !b.isDirectory) return -1;
+      if (!a.isDirectory && b.isDirectory) return 1;
       return a.name.localeCompare(b.name);
     });
   },
@@ -174,7 +174,7 @@ export const nativeFs: NativeFs = {
             results.push({
               name: entry.name,
               path: entryPath,
-              is_directory: false,
+              isDirectory: false,
               type: 'file'
             });
           }
@@ -224,7 +224,7 @@ export const nativeFs: NativeFs = {
                 file: {
                   name: entry.name,
                   path: entryPath,
-                  is_directory: false,
+                  isDirectory: false,
                   type: 'file'
                 },
                 line: i + 1,
@@ -255,7 +255,7 @@ export const nativeFs: NativeFs = {
         results.push({
           name: entry.name,
           path: entryPath,
-          is_directory: entry.isDirectory,
+          isDirectory: entry.isDirectory,
           type: entry.isDirectory ? 'directory' : 'file'
         });
       }
@@ -293,7 +293,7 @@ export const nativeFs: NativeFs = {
         results.push({
           name: entry.name,
           path: entryPath,
-          is_directory: entry.isDirectory,
+          isDirectory: entry.isDirectory,
           type: entry.isDirectory ? 'directory' : 'file'
         });
       }

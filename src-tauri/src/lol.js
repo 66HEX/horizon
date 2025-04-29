@@ -1,4 +1,4 @@
-/// File system operations module
+/// File system operations moduleasdasdasd
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::io::Write;
@@ -10,7 +10,7 @@ use walkdir::WalkDir;
 use globset::{Glob, GlobSetBuilder, GlobSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Create a new directory at the specified path
+/// Create a new directory at the specified pathhhhhhhhhhhhhhhhhh
 /// 
 /// # Arguments
 /// * `path` - The path where the directory should be created

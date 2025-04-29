@@ -31,7 +31,7 @@ export function FileSelectionTabs() {
                 <div className="flex items-center gap-1">
                   <IconFileText className="h-4 w-4" />
                   <span className="truncate max-w-[150px]">{file.name}</span>
-                  {file.is_unsaved && (
+                  {file.isUnsaved && (
                     <span className="ml-2 text-yellow-500">*</span>
                   )}
                 </div>

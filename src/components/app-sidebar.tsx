@@ -426,13 +426,13 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
   
   // Effect to load contents when expanded
   useEffect(() => {
-    if (item.is_directory && isExpanded && (item.needs_loading || !item.children || item.children.length === 0)) {
+    if (item.isDirectory && isExpanded && (item.needsLoading || !item.children || item.children.length === 0)) {
       loadDirectoryContents(item.path, item);
     }
   }, [isExpanded, item, loadDirectoryContents]);
   
   const handleClick = () => {
-    if (item.is_directory) {
+    if (item.isDirectory) {
       setIsExpanded(!isExpanded);
     } else {
       onFileClick(item.path);
@@ -448,7 +448,7 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
   
   const handlePasteInFolder = async () => {
     try {
-      if (item.is_directory) {
+      if (item.isDirectory) {
         handlePaste(item.path);
       } else {
         const { dirname } = await import('@tauri-apps/api/path');
@@ -462,7 +462,7 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
   };
   
   // Determine loading state
-  const isLoading = item.is_directory && isExpanded && item.needs_loading;
+  const isLoading = item.isDirectory && isExpanded && item.needsLoading;
   
   return (
     <div className="pl-1 max-w-[16rem]">
@@ -477,7 +477,7 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
           onClick={handleClick}
           onContextMenu={handleContextMenu}
         >
-          {item.is_directory ? (
+          {item.isDirectory ? (
             <IconChevronRight 
               className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`}
             />
@@ -496,7 +496,7 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
               top: `${contextMenuPosition.y}px`
             }}
           >
-            {item.is_directory && (
+            {item.isDirectory && (
               <>
                 <DropdownMenuGroup>
                   <DropdownMenuItem onSelect={() => {
@@ -536,7 +536,7 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
               {hasClipboardContent && (
                 <DropdownMenuItem onSelect={handlePasteInFolder}>
                   <IconClipboard className="mr-2 h-4 w-4" />
-                  <span>Paste {!item.is_directory && "in Parent Folder"}</span>
+                  <span>Paste {!item.isDirectory && "in Parent Folder"}</span>
                 </DropdownMenuItem>
               )}
             </DropdownMenuGroup>
@@ -585,7 +585,7 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
         )}
       </DropdownMenu>
       
-      {item.is_directory && isExpanded && (
+      {item.isDirectory && isExpanded && (
         <div className="pl-3">
           {isLoading ? (
             <div className="flex items-center gap-2 py-1 px-2 text-sm text-muted-foreground">

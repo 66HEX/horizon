@@ -85,7 +85,7 @@ interface FileState {
   openFile: () => Promise<FileInfo | null>;
   openFileFromPath: (path: string) => Promise<FileInfo | null>;
   openDirectory: () => Promise<DirectoryItem[] | null>;
-  saveFile: (content: string) => Promise<FileInfo | null>;
+  saveFile: () => Promise<void>;
   saveFileAs: (content: string) => Promise<FileInfo | null>;
   updateFileContent: (content: string) => void;
   searchFiles: (query: string) => Promise<DirectoryItem[]>;
@@ -125,7 +125,7 @@ export const useFileStore = create<FileState>((set, get) => {
       path: file.path,
       name: file.name,
       content: file.content,
-      is_unsaved: file.is_unsaved || false
+      isUnsaved: file.isUnsaved || false
     };
     
     if (existingFileIndex === -1) {
@@ -214,57 +214,35 @@ export const useFileStore = create<FileState>((set, get) => {
       }
     },
 
-    saveFile: async (content) => {
+    saveFile: async () => {
+      const { currentFile } = get();
+      if (!currentFile) return;
+
       try {
-        const { currentFile } = get();
-        if (!currentFile) {
-          return null;
-        }
-        
-        if (content.trim().length === 0) {
-          console.warn('Warning: Attempting to save empty content');
-          
-          const editorContainer = document.querySelector('[data-editor-container]') as any;
-          if (editorContainer && editorContainer.__currentContent) {
-            content = editorContainer.__currentContent;
-          } 
-          else if (currentFile.content && currentFile.content.length > 0) {
-            content = currentFile.content;
-          }
-          else if (editorContainer) {
-            const editorContent = editorContainer.querySelector('.cm-content')?.textContent;
-            if (editorContent && editorContent.length > 0) {
-              content = editorContent;
+        const fileService = new FileService();
+        await fileService.saveFile(currentFile.path, currentFile.content);
+
+        set((state) => {
+          const fileIndex = state.openFiles.findIndex(f => f.path === currentFile.path);
+          if (fileIndex === -1) return state;
+
+          const newOpenFiles = [...state.openFiles];
+          newOpenFiles[fileIndex] = {
+            ...currentFile,
+            isUnsaved: false
+          };
+
+          return {
+            openFiles: newOpenFiles,
+            currentFile: {
+              ...currentFile,
+              isUnsaved: false
             }
-          }
-        }
-        
-        const file = await fileService.saveFile(content, false);
-        
-        if (file) {
-          set((state) => {
-            const updatedOpenFiles = state.openFiles.map(f =>
-              f.path === file.path ? {
-                ...f,
-                content: content,
-                is_unsaved: false
-              } : f
-            );
-            
-            return {
-              openFiles: updatedOpenFiles,
-              currentFile: {
-                ...file,
-                content: content
-              }
-            };
-          });
-        }
-        
-        return file;
+          };
+        });
       } catch (error) {
-        console.error('Error in saveFile:', error);
-        return null;
+        console.error('Error saving file:', error);
+        throw error;
       }
     },
 
@@ -284,37 +262,33 @@ export const useFileStore = create<FileState>((set, get) => {
       const { currentFile } = get();
       if (!currentFile) return;
 
-      const updatedFile: FileInfo = {
-        id: currentFile.id,
-        path: currentFile.path,
-        name: currentFile.name,
-        content: content,
-        is_unsaved: true
-      };
-
       set((state) => {
         const fileIndex = state.openFiles.findIndex(f => f.path === currentFile.path);
-        
+        const updatedFile: FileInfo = {
+          id: currentFile.id,
+          path: currentFile.path,
+          name: currentFile.name,
+          content: content,
+          isUnsaved: true
+        };
+
         if (fileIndex !== -1) {
           const newOpenFiles = [...state.openFiles];
           newOpenFiles[fileIndex] = updatedFile;
           
           return {
             openFiles: newOpenFiles,
-            currentFile: updatedFile
+            currentFile: updatedFile,
+            activeFilePath: currentFile.path
           };
         } else {
           return {
             openFiles: [...state.openFiles, updatedFile],
-            currentFile: updatedFile
+            currentFile: updatedFile,
+            activeFilePath: currentFile.path
           };
         }
       });
-      
-      const editorContainer = document.querySelector('[data-editor-container]');
-      if (editorContainer) {
-        (editorContainer as any).__currentContent = content;
-      }
     },
 
     searchFiles: async (query) => {
@@ -322,7 +296,9 @@ export const useFileStore = create<FileState>((set, get) => {
     },
 
     searchFileContents: async (query) => {
-      return fileService.searchFileContents(query);
+      const { currentDirectory } = get();
+      if (!currentDirectory) return [];
+      return fileService.searchFileContents(query, currentDirectory);
     },
 
     isImageFile: (filePath) => {
@@ -348,7 +324,7 @@ export const useFileStore = create<FileState>((set, get) => {
                   return {
                     ...currentItem,
                     children: contents,
-                    needs_loading: false
+                    needsLoading: false
                   };
                 }
 
@@ -412,7 +388,13 @@ export const useFileStore = create<FileState>((set, get) => {
       set((state) => {
         const file = state.openFiles.find(f => f.path === filePath);
         if (file) {
-          const fileDeepCopy = { ...file };
+          const fileDeepCopy = { 
+            id: file.id,
+            path: file.path,
+            name: file.name,
+            content: file.content,
+            isUnsaved: file.isUnsaved
+          };
           return {
             currentFile: fileDeepCopy,
             activeFilePath: filePath
@@ -483,7 +465,7 @@ export const useFileStore = create<FileState>((set, get) => {
                     return {
                       ...currentItem,
                       children: parentContents,
-                      needs_loading: false
+                      needsLoading: false
                     };
                   }
 
@@ -520,7 +502,7 @@ export const useFileStore = create<FileState>((set, get) => {
                           return {
                             ...currentItem,
                             children: sourceContents,
-                            needs_loading: false
+                            needsLoading: false
                           };
                         }
 
@@ -617,7 +599,7 @@ export const useFileStore = create<FileState>((set, get) => {
                     return {
                       ...currentItem,
                       children: parentContents,
-                      needs_loading: false
+                      needsLoading: false
                     };
                   }
 
@@ -652,7 +634,7 @@ export const useFileStore = create<FileState>((set, get) => {
                   path: newPath,
                   name: newName,
                   content: f.content,
-                  is_unsaved: f.is_unsaved
+                  isUnsaved: f.isUnsaved
                 };
               }
               return { ...f };
@@ -664,7 +646,7 @@ export const useFileStore = create<FileState>((set, get) => {
                   path: newPath,
                   name: newName,
                   content: currentFile.content,
-                  is_unsaved: currentFile.is_unsaved
+                  isUnsaved: currentFile.isUnsaved
                 }
               : currentFile;
             
@@ -726,7 +708,7 @@ export const useFileStore = create<FileState>((set, get) => {
                     return {
                       ...currentItem,
                       children: parentContents,
-                      needs_loading: false
+                      needsLoading: false
                     };
                   }
 
@@ -840,7 +822,7 @@ export const useFileStore = create<FileState>((set, get) => {
                     return {
                       ...currentItem,
                       children: parentContents,
-                      needs_loading: false
+                      needsLoading: false
                     };
                   }
 
@@ -885,10 +867,10 @@ export const useFileStore = create<FileState>((set, get) => {
                 return items.map((currentItem) => {
                   if (currentItem.path === path) {
                     const updatedContents = parentContents.map(child => {
-                      if (child.path === folderPath && child.is_directory) {
+                      if (child.path === folderPath && child.isDirectory) {
                         return {
                           ...child,
-                          needs_loading: false,
+                          needsLoading: false,
                           children: []
                         };
                       }
@@ -898,7 +880,7 @@ export const useFileStore = create<FileState>((set, get) => {
                         return {
                           ...child,
                           children: existingChild.children,
-                          needs_loading: existingChild.needs_loading
+                          needsLoading: existingChild.needsLoading
                         };
                       }
                       
@@ -908,7 +890,7 @@ export const useFileStore = create<FileState>((set, get) => {
                     return {
                       ...currentItem,
                       children: updatedContents,
-                      needs_loading: false
+                      needsLoading: false
                     };
                   }
 
@@ -970,14 +952,14 @@ export const useFileStore = create<FileState>((set, get) => {
               return newItems.map(newItem => {
                 const oldItem = oldItems.find(item => item.path === newItem.path);
                 
-                if (oldItem && newItem.is_directory && oldItem.is_directory) {
-                  if (oldItem.children && !oldItem.needs_loading) {
+                if (oldItem && newItem.isDirectory && oldItem.isDirectory) {
+                  if (oldItem.children && !oldItem.needsLoading) {
                     return {
                       ...newItem,
                       children: oldItem.children.length > 0 ? 
                         mergeStructure(newItem.children || [], oldItem.children) : 
                         newItem.children,
-                      needs_loading: false 
+                      needsLoading: false 
                     };
                   }
                 }
