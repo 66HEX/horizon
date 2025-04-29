@@ -110,7 +110,6 @@ export class FileService {
    */
   async openDirectory(): Promise<DirectoryItem[] | null> {
     try {
-      // Open folder selection dialog
       const selected = await open({
         directory: true,
         multiple: false
@@ -126,10 +125,8 @@ export class FileService {
       this.fileContentIndex.clear();
       this.fileSearchIndex.clear();
       
-      // Use native Rust function to scan directory
       try {
         const rustItems = await nativeFs.scanDirectory(dirPath, 0, 2);
-        // Convert the Rust items to our DirectoryItem format
         this.directoryStructure = this.convertRustDirectoryItems(rustItems);
       } catch (error) {
         console.error('Error using native directory scanning, falling back to JS implementation:', error);
@@ -169,14 +166,12 @@ export class FileService {
     try {
       console.log(`Scanning directory: ${dirPath} at depth ${depth}`);
       
-      // Try to use Rust implementation
       try {
         const rustItems = await nativeFs.scanDirectory(dirPath, depth, 2);
         return this.convertRustDirectoryItems(rustItems);
       } catch (error) {
         console.error('Error with Rust directory scanning, falling back to JS:', error);
         
-        // Fallback to JS implementation
         const entries = await readDir(dirPath);
         console.log(`Found ${entries.length} entries in ${dirPath}`);
         const result: DirectoryItem[] = [];
@@ -228,7 +223,6 @@ export class FileService {
    */
   async loadDirectoryContents(dirPath: string): Promise<DirectoryItem[]> {
     try {
-      // Use Rust implementation
       try {
         const rustItems = await nativeFs.scanDirectory(dirPath, 0, 0);
         return this.convertRustDirectoryItems(rustItems);
@@ -252,7 +246,6 @@ export class FileService {
         return null;
       }
       
-      // Use Rust implementation
       try {
         const rustItems = await nativeFs.scanDirectory(this.currentDirectory, 0, 2);
         this.directoryStructure = this.convertRustDirectoryItems(rustItems);
@@ -298,7 +291,76 @@ export class FileService {
  */
 async saveFile(path: string, content: string): Promise<void> {
   try {
+
     await window.electron.ipcRenderer.invoke('save-file', { path, content });
+
+    let filePath: string | null = null;
+    
+    if (saveAs || !this.currentFile) {
+      const selected = await save({
+        filters: [
+          { name: 'Source Code', extensions: ['js', 'jsx', 'ts', 'tsx', 'html', 'css', 'json'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      });
+      
+      if (!selected) {
+        return null;
+      }
+      
+      filePath = selected as string;
+    } else {
+      filePath = this.currentFile.path;
+    }
+    
+    const cleanContent = String(content);
+    
+    await nativeFs.writeToFile(filePath, cleanContent);
+    
+    try {
+      await nativeFs.readFile(filePath);
+    } catch (error) {
+      console.error('[FileService] Error verifying saved content:', error);
+    }
+    
+    try {
+      const fileInfo = await nativeFs.getFileInfo(filePath);
+      const actualContent = cleanContent;
+      
+      const updatedFile: FileInfo = {
+        id: saveAs ? fileInfo.id : (this.currentFile?.id || fileInfo.id),
+        path: fileInfo.path,
+        name: fileInfo.name,
+        content: actualContent,
+        isUnsaved: false
+      };
+      
+      console.log(`[FileService] Returning updated file info with content length: ${updatedFile.content.length}`);
+      
+      this.currentFile = updatedFile;
+      return updatedFile;
+    } catch (error) {
+      console.error('[FileService] Error getting file info after save, falling back to JS implementation:', error);
+      const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || 'unknown';
+      
+      const id = saveAs 
+        ? `${filePath}-${Date.now()}-${Math.random().toString(36).substring(2, 12)}`
+        : (this.currentFile?.id || `${filePath}-${Date.now()}-${Math.random().toString(36).substring(2, 12)}`);
+      
+      const updatedFile: FileInfo = {
+        id,
+        path: filePath,
+        name: fileName,
+        content: cleanContent,
+        isUnsaved: false
+      };
+      
+      console.log(`[FileService] Returning file info from fallback with content length: ${updatedFile.content.length}`);
+      
+      this.currentFile = updatedFile;
+      return updatedFile;
+    }
+
   } catch (error) {
     console.error('Error saving file:', error);
     throw error;
@@ -352,6 +414,7 @@ async saveFile(path: string, content: string): Promise<void> {
    * @param maxResults - Maximum number of results
    * @returns Array of items containing the query
    */
+
   async searchFileContents(query: string, dirPath: string, maxResults: number = 20): Promise<DirectoryItem[]> {
     const results: DirectoryItem[] = [];
     const entries = await readDir(dirPath);
@@ -375,6 +438,19 @@ async saveFile(path: string, content: string): Promise<void> {
           console.error(`Error reading file ${entryPath}:`, error);
         }
       }
+
+  async searchFileContents(query: string, maxResults: number = 20): Promise<DirectoryItem[]> {
+    if (!query || !this.currentDirectory) {
+      return [];
+    }
+    
+    try {
+      const results = await nativeFs.searchFileContents(query, this.currentDirectory, maxResults);
+      return this.mapNativeFsItems(results);
+    } catch (error) {
+      console.error('Error searching file contents:', error);
+      return [];
+
     }
 
     return results;
@@ -401,7 +477,6 @@ async saveFile(path: string, content: string): Promise<void> {
     }
     
     try {
-      // Use the advanced Rust implementation
       return await nativeFs.searchFileContentsAdvanced(
         query, 
         this.currentDirectory, 
@@ -423,7 +498,6 @@ async saveFile(path: string, content: string): Promise<void> {
    */
   isImageFile(filePath: string): boolean {
     try {
-      // Try Rust implementation synchronously
       const extensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp'];
       const path = filePath.toLowerCase();
       return extensions.some(ext => path.endsWith(ext));
@@ -442,7 +516,6 @@ async saveFile(path: string, content: string): Promise<void> {
    */
   isAudioFile(filePath: string): boolean {
     try {
-      // Try Rust implementation synchronously
       const extensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'];
       const path = filePath.toLowerCase();
       return extensions.some(ext => path.endsWith(ext));
@@ -461,7 +534,6 @@ async saveFile(path: string, content: string): Promise<void> {
    */
   async isImageFileAsync(filePath: string): Promise<boolean> {
     try {
-      // Try Rust implementation
       return await nativeFs.isImageFile(filePath);
     } catch (error) {
       console.error('Error with Rust image check, falling back to JS:', error);
@@ -478,7 +550,6 @@ async saveFile(path: string, content: string): Promise<void> {
    */
   async isAudioFileAsync(filePath: string): Promise<boolean> {
     try {
-      // Try Rust implementation
       return await nativeFs.isAudioFile(filePath);
     } catch (error) {
       console.error('Error with Rust audio check, falling back to JS:', error);
@@ -500,7 +571,6 @@ async saveFile(path: string, content: string): Promise<void> {
     }
     
     try {
-      // Use the new, more efficient Rust implementation for search
       const results = await nativeFs.searchFilesByName(query, this.currentDirectory, maxResults);
       return this.mapNativeFsItems(results);
     } catch (error) {
@@ -528,7 +598,6 @@ async saveFile(path: string, content: string): Promise<void> {
     }
     
     try {
-      // Use the advanced Rust implementation
       const results = await nativeFs.searchFilesByNameAdvanced(
         query, 
         this.currentDirectory,
@@ -547,8 +616,6 @@ async saveFile(path: string, content: string): Promise<void> {
    * Stops file indexing in memory as it's now handled by the backend
    */
   private async indexDirectoryContents() {
-    // This method is kept for compatibility but is essentially a no-op now
-    // since indexing and searching is now handled by the backend
     console.log('File indexing is now handled by the backend');
   }
 

@@ -4,7 +4,6 @@ import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { dirname, basename, join } from '@tauri-apps/api/path';
 import { nativeFs } from './native-fs';
 
-// Audio Store
 interface AudioPlayer {
   id: string;
   pause: () => void;
@@ -59,7 +58,6 @@ export const useAudioStore = create<AudioState>((set, get) => ({
   }
 }));
 
-// File Store
 interface FileState {
   fileService: FileService;
   currentFile: FileInfo | null;

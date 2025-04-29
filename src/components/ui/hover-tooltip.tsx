@@ -156,7 +156,9 @@ const HoverTooltip = React.forwardRef<HTMLDivElement, HoverTooltipProps>(
                 <Separator />
                 <div className="text-xs markdown-content p-3 pb-3 max-w-md">
                   <ReactMarkdown
+
                     remarkPlugins={[remarkGfm]}
+
                     components={{
                       h1: ({ node, ...props }) => <h1 className={markdownStyles.h1} {...props} />,
                       h2: ({ node, ...props }) => <h2 className={markdownStyles.h2} {...props} />,
@@ -203,9 +205,16 @@ const HoverTooltip = React.forwardRef<HTMLDivElement, HoverTooltipProps>(
                       thead: ({ node, ...props }) => <thead className={markdownStyles.thead} {...props} />,
                       tbody: ({ node, ...props }) => <tbody className={markdownStyles.tbody} {...props} />,
                       tr: ({ node, ...props }) => <tr className={markdownStyles.tr} {...props} />,
+
                       th: ({ node, ...props }) => <th className={markdownStyles.th} {...props} />,
                       td: ({ node, ...props }) => <td className={markdownStyles.td} {...props} />
                     }}
+
+                      th: ({ node, ...props }) => <th scope="col" className={markdownStyles.th} {...props} />,
+                      td: ({ node, ...props }) => <td className={markdownStyles.td} {...props} />,
+                    }}
+                    remarkPlugins={[remarkGfm]}
+
                   >
                     {data.documentation}
                   </ReactMarkdown>

@@ -142,6 +142,131 @@ const getLanguageFromExtension = useCallback((fileName: string) => {
 const fileLanguage = useMemo(() => 
     currentFile ? getLanguageFromExtension(currentFile.name) : 'typescript',
 [currentFile?.name, getLanguageFromExtension]);
+=======
+        
+        onSave();
+    };
+        
+    return (
+        <CodeEditor 
+            initialValue={file.content}
+            onChange={handleChange}
+            language={language}
+            onSave={handleSave}
+            filePath={file.path}
+        />
+    );
+}, (prevProps, nextProps) => {
+    const isEqual = prevProps.file.id === nextProps.file.id &&
+                prevProps.file.path === nextProps.file.path &&
+                prevProps.language === nextProps.language;
+    
+    return isEqual;
+});
+
+function MainContent() {
+    const { 
+        currentFile, 
+        updateFileContent, 
+        activeFilePath,
+        isImageFile,
+        isAudioFile,
+        saveFile
+    } = useFileStore();
+    
+    const { state: sidebarState } = useSidebar();
+    const prevFilePathRef = useRef<string | null>(null);
+    
+    const [isTerminalVisible, setIsTerminalVisible] = useState(false);
+    const [terminalInstances, setTerminalInstances] = useState<TerminalInstance[]>([]);
+    const [activeTerminalId, setActiveTerminalId] = useState<string | null>(null);
+    
+    const handleContentChange = useCallback((content: string) => {
+        updateFileContent(content);
+    }, [updateFileContent]);
+
+    const handleSaveFile = useCallback(() => {
+        if (currentFile) {
+    
+            let contentToSave = currentFile.content;
+            
+            const editorContainer = document.querySelector('[data-editor-container]') as any;
+            if (editorContainer && editorContainer.__currentContent) {
+                contentToSave = editorContainer.__currentContent;
+            }
+            else if (contentToSave.length === 0 && editorContainer) {
+                const editorContent = editorContainer.querySelector('.cm-content')?.textContent;
+                if (editorContent && editorContent.length > 0) {
+                    contentToSave = editorContent;
+                }
+            }
+            saveFile(contentToSave);
+        }
+    }, [saveFile, currentFile?.id, currentFile?.path]);
+    
+    useEffect(() => {
+        if (prevFilePathRef.current !== activeFilePath) {
+            prevFilePathRef.current = activeFilePath;
+        }
+    }, [activeFilePath]);
+
+const getLanguageFromExtension = useCallback((fileName: string) => {
+    if (!fileName || !fileName.includes('.')) return 'typescript';
+    
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    
+    // Log detected extension for debugging
+    console.log(`Detecting language for file extension: ${ext}`);
+    
+    switch (ext) {
+        case 'js': return 'javascript';
+        case 'jsx': return 'jsx';
+        case 'ts': return 'typescript';
+        case 'tsx': return 'tsx';
+        case 'mjs': return 'mjs';
+        case 'html': return 'html';
+        case 'css': return 'css';
+        case 'json': return 'json';
+        
+        case 'py': return 'python';
+        case 'rb': return 'ruby';
+        case 'php': return 'php';
+        case 'java': return 'java';
+        case 'go': return 'go';
+        case 'rs': return 'rust';
+        case 'c': return 'c';
+        case 'cpp': 
+        case 'cc':
+        case 'cxx': return 'cpp';
+        case 'cs': return 'csharp';
+        
+        case 'yml':
+        case 'yaml': return 'yaml';
+        case 'xml': return 'xml';
+        case 'md': return 'markdown';
+        case 'sql': return 'sql';
+        
+        case 'sh':
+        case 'bash': return 'shell';
+        
+        case 'swift': return 'swift';
+        case 'kt': return 'kotlin';
+        case 'dart': return 'dart';
+        
+        case 'sass':
+        case 'scss': return 'sass';
+        case 'less': return 'less';
+        
+        default: return 'typescript';
+    }
+}, []);
+
+const fileLanguage = useMemo(() => {
+    const lang = currentFile ? getLanguageFromExtension(currentFile.name) : 'typescript';
+    console.log(`Detected language for ${currentFile?.name}: ${lang}`);
+    return lang;
+}, [currentFile?.name, getLanguageFromExtension]);
+
 
 const EditorContentArea = useMemo(() => {
    

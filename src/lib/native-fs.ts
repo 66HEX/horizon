@@ -121,9 +121,37 @@ export const nativeFs: NativeFs = {
     return await readTextFile(filePath);
   },
 
+
   async writeToFile(filePath: string, content: string): Promise<void> {
     await writeTextFile(filePath, content);
   },
+
+/**
+ * Write text to a file, overwriting existing content
+ * @param path - Path of the file
+ * @param content - Content to write
+ * @returns Promise that resolves when operation completes
+ */
+export async function writeToFile(path: string, content: string): Promise<void> {
+  console.log(`[native-fs] writeToFile called for path: ${path}`);
+  console.log(`[native-fs] Content type: ${typeof content}, length: ${content.length}`);
+  console.log(`[native-fs] Content preview: "${content.substring(0, 50)}..."`);
+  
+  if (typeof content !== 'string') {
+    console.error(`[native-fs] Invalid content type: ${typeof content}`);
+    content = String(content);
+    console.log(`[native-fs] Converted content length: ${content.length}`);
+  }
+  
+  if (content.includes('\0')) {
+    console.warn(`[native-fs] Content contains null characters, cleaning...`);
+    content = content.replace(/\0/g, '');
+    console.log(`[native-fs] Cleaned content length: ${content.length}`);
+  }
+  
+  return invoke('write_to_file', { path, content });
+}
+
 
   async isDirectory(path: string): Promise<boolean> {
     try {

@@ -226,7 +226,6 @@ pub fn append_to_file(path: String, content: String) -> Result<(), String> {
 /// Result indicating success or error message
 #[command]
 pub fn write_to_file(path: String, content: String) -> Result<(), String> {
-    println!("write_to_file called for path: {}, content length: {}, content: {:?}", path, content.len(), content);
     
     if content.is_empty() {
         println!("WARNING: Attempting to write empty content to file: {}", path);
@@ -250,7 +249,6 @@ pub fn write_to_file(path: String, content: String) -> Result<(), String> {
     file.sync_all()
         .map_err(|e| format!("Failed to sync file to disk: {}", e))?;
     
-    println!("Successfully wrote {} bytes to file: {}, content: {:?}", content.len(), path, content);
     
     match fs::read_to_string(&path) {
         Ok(read_content) => println!("Verification: Read {} bytes after write", read_content.len()),
@@ -296,7 +294,6 @@ pub fn get_file_info(path: String) -> Result<FileInfo, String> {
         attempts += 1;
     }
     
-    println!("Successfully read {} bytes from file: {}", content.len(), path);
     
     let name = Path::new(&path)
         .file_name()
