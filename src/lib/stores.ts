@@ -212,60 +212,62 @@ export const useFileStore = create<FileState>((set, get) => {
       }
     },
 
-
-saveFile: async (content) => {
-  try {
-    const { currentFile } = get();
-    if (!currentFile) {
-      return null;
-    }
-    
-    if (content.trim().length === 0) {
-      console.warn('Warning: Attempting to save empty content');
-      
-      const editorContainer = document.querySelector('[data-editor-container]') as any;
-      if (editorContainer && editorContainer.__currentContent) {
-        content = editorContainer.__currentContent;
-      } 
-      else if (currentFile.content && currentFile.content.length > 0) {
-        content = currentFile.content;
-      }
-      else if (editorContainer) {
-        const editorContent = editorContainer.querySelector('.cm-content')?.textContent;
-        if (editorContent && editorContent.length > 0) {
-          content = editorContent;
+    saveFile: async (content) => {
+      try {
+        const { currentFile } = get();
+        if (!currentFile) {
+          return null;
         }
-      }
-    }
-    
-    const file = await fileService.saveFile(content, false);
-    
-    if (file) {
-      set((state) => {
-        const updatedOpenFiles = state.openFiles.map(f =>
-          f.path === file.path ? {
-            ...f,
-            content: content,
-            isUnsaved: false
-          } : f
-        );
         
-        return {
-          openFiles: updatedOpenFiles,
-          currentFile: {
-            ...file,
-            content: content
+        const editorContainer = document.querySelector('[data-editor-container]') as any;
+        if (editorContainer && editorContainer.__currentContent) {
+          content = editorContainer.__currentContent;
+          console.log("Using content from __currentContent, length:", content.length);
+        } 
+        else if (content.trim().length === 0) {
+          console.warn('Warning: Attempting to save empty content');
+          
+          if (currentFile.content && currentFile.content.length > 0) {
+            content = currentFile.content;
+            console.log("Using content from currentFile, length:", content.length);
           }
-        };
-      });
-    }
-    
-    return file;
-  } catch (error) {
-    console.error('Error in saveFile:', error);
-    return null;
-  }
-},
+          else if (editorContainer) {
+            const editorContent = editorContainer.querySelector('.cm-content')?.textContent;
+            if (editorContent && editorContent.length > 0) {
+              content = editorContent;
+              console.log("Using content from .cm-content, length:", content.length);
+            }
+          }
+        }
+        
+        const file = await fileService.saveFile(content, false);
+        
+        if (file) {
+          set((state) => {
+            const updatedOpenFiles = state.openFiles.map(f =>
+              f.path === file.path ? {
+                ...f,
+                content: content,
+                isUnsaved: false
+              } : f
+            );
+            
+            return {
+              openFiles: updatedOpenFiles,
+              currentFile: {
+                ...file,
+                content: content
+              }
+            };
+          });
+        }
+        
+        return file;
+      } catch (error) {
+        console.error('Error in saveFile:', error);
+        return null;
+      }
+    },
 
     saveFileAs: async (content) => {
       try {
@@ -279,43 +281,42 @@ saveFile: async (content) => {
       }
     },
 
+    updateFileContent: (content) => {
+      const { currentFile } = get();
+      if (!currentFile) return;
 
-updateFileContent: (content) => {
-  const { currentFile } = get();
-  if (!currentFile) return;
+      const updatedFile: FileInfo = {
+        id: currentFile.id,
+        path: currentFile.path,
+        name: currentFile.name,
+        content: content,
+        isUnsaved: true
+      };
 
-  const updatedFile: FileInfo = {
-    id: currentFile.id,
-    path: currentFile.path,
-    name: currentFile.name,
-    content: content,
-    isUnsaved: true
-  };
-
-  set((state) => {
-    const fileIndex = state.openFiles.findIndex(f => f.path === currentFile.path);
-    
-    if (fileIndex !== -1) {
-      const newOpenFiles = [...state.openFiles];
-      newOpenFiles[fileIndex] = updatedFile;
+      set((state) => {
+        const fileIndex = state.openFiles.findIndex(f => f.path === currentFile.path);
+        
+        if (fileIndex !== -1) {
+          const newOpenFiles = [...state.openFiles];
+          newOpenFiles[fileIndex] = updatedFile;
+          
+          return {
+            openFiles: newOpenFiles,
+            currentFile: updatedFile
+          };
+        } else {
+          return {
+            openFiles: [...state.openFiles, updatedFile],
+            currentFile: updatedFile
+          };
+        }
+      });
       
-      return {
-        openFiles: newOpenFiles,
-        currentFile: updatedFile
-      };
-    } else {
-      return {
-        openFiles: [...state.openFiles, updatedFile],
-        currentFile: updatedFile
-      };
-    }
-  });
-  
-  const editorContainer = document.querySelector('[data-editor-container]');
-  if (editorContainer) {
-    (editorContainer as any).__currentContent = content;
-  }
-},
+      const editorContainer = document.querySelector('[data-editor-container]');
+      if (editorContainer) {
+        (editorContainer as any).__currentContent = content;
+      }
+    },
 
     searchFiles: async (query) => {
       return fileService.searchFiles(query);
