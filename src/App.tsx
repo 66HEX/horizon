@@ -42,7 +42,7 @@ const EditorContainer = memo(({ file, language, onChangeContent, onSave }: {
     
     const currentContentRef = useRef(file.content);
     
-    // Zaktualizuj referencję, gdy plik się zmieni
+    
     useEffect(() => {
         currentContentRef.current = file.content;
         
@@ -114,22 +114,35 @@ function MainContent() {
 
     const handleSaveFile = useCallback(() => {
         if (currentFile) {
-    
-            let contentToSave = currentFile.content;
+            let contentToSave = '';
+            
             
             const editorContainer = document.querySelector('[data-editor-container]') as any;
             if (editorContainer && editorContainer.__currentContent) {
                 contentToSave = editorContainer.__currentContent;
+                console.log(`[App] Getting content from __currentContent, length: ${contentToSave.length}`);
             }
-            else if (contentToSave.length === 0 && editorContainer) {
+            
+            else if (currentFile.content && currentFile.content.length > 0) {
+                contentToSave = currentFile.content;
+                console.log(`[App] Falling back to currentFile.content, length: ${contentToSave.length}`);
+            }
+            
+            else if (editorContainer) {
                 const editorContent = editorContainer.querySelector('.cm-content')?.textContent;
                 if (editorContent && editorContent.length > 0) {
                     contentToSave = editorContent;
+                    console.log(`[App] Extracted content from DOM, length: ${contentToSave.length}`);
                 }
             }
+            
+            if (contentToSave.length === 0) {
+                console.warn("[App] Warning: Content to save is empty!");
+            }
+            
             saveFile(contentToSave);
         }
-    }, [saveFile, currentFile?.id, currentFile?.path]);
+    }, [saveFile, currentFile?.id, currentFile?.path, currentFile]);
     
     useEffect(() => {
         if (prevFilePathRef.current !== activeFilePath) {
@@ -142,7 +155,7 @@ const getLanguageFromExtension = useCallback((fileName: string) => {
     
     const ext = fileName.split('.').pop()?.toLowerCase();
     
-    // Log detected extension for debugging
+    
     console.log(`Detecting language for file extension: ${ext}`);
     
     switch (ext) {
@@ -309,3 +322,4 @@ export default function App() {
         </SidebarProvider>
     );
 }
+
