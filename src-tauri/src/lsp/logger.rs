@@ -53,7 +53,8 @@ pub fn init(log_file_path: &str, level: LogLevel) -> Result<()> {
 
 fn log_to_file(log_entry: &str) {
     unsafe {
-        if let Some(path) = &LOG_FILE_PATH {
+        let log_file_ptr = &raw const LOG_FILE_PATH;
+        if let Some(path) = &*log_file_ptr {
             if let Ok(mut file) = OpenOptions::new()
                 .create(true)
                 .append(true)

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
-import { FormattedHoverData } from "@/components/ui/hover-tooltip";
+import { EnhancedHoverData as UIEnhancedHoverData } from "@/components/ui/hover-tooltip";
 
 export type CompletionItem = {
   label: string;
@@ -18,9 +18,28 @@ export type DiagnosticItem = {
   };
 };
 
+export type EnhancedHoverData = {
+  title: string;
+  signature: string | null;
+  documentation: string | null;
+  source_code: string | null;
+  raw: string;
+  metadata: DocumentationMetadata;
+};
+
+export type DocumentationMetadata = {
+  has_code_blocks: boolean;
+  has_tables: boolean;
+  has_lists: boolean;
+  content_type: ContentType;
+  warning_messages: string[];
+};
+
+export type ContentType = 'function' | 'struct' | 'variable' | 'module' | 'generic';
+
 export type HoverInfo = {
   contents: string;
-  formattedContents?: FormattedHoverData;
+  enhancedContents?: UIEnhancedHoverData;
   range?: {
     start: { line: number; character: number };
     end: { line: number; character: number };
@@ -1023,16 +1042,21 @@ export const useLspStore = create<LspState>((set, get) => ({
         }
         
         try {
-          const formattedData = await invoke<FormattedHoverData>('format_hover_data', { 
-            contents: response.payload.contents 
-          });
-          
-          return { 
-            contents: response.payload.contents,
-            formattedContents: formattedData
-          };
+          try {
+            const enhancedData = await invoke<UIEnhancedHoverData>('format_hover_data_enhanced', { 
+              contents: response.payload.contents 
+            });
+            
+            return { 
+              contents: response.payload.contents,
+              enhancedContents: enhancedData
+            };
+          } catch (enhancedError) {
+            console.error('Enhanced formatting failed:', enhancedError);
+            return { contents: response.payload.contents };
+          }
         } catch (formattingError) {
-          console.error('Błąd podczas formatowania hover:', formattingError);
+          console.error('Error during hover formatting:', formattingError);
           return { contents: response.payload.contents };
         }
       } else if (response.type === 'Error') {
@@ -1175,4 +1199,4 @@ window.addEventListener('beforeunload', () => {
     stopLspWebSocketServer()
       .catch(error => console.error('Error shutting down WebSocket server:', error));
   }
-}); 
+});
