@@ -198,19 +198,19 @@ impl LspProcessConnection {
                             
                             match String::from_utf8(content) {
                                 Ok(content_str) => {
-                                    // First, check if it's a notification (no "id" field but has "method")
+                                    
                                     if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&content_str) {
                                         if json_value.get("method").is_some() && json_value.get("id").is_none() {
-                                            // This is a notification, not a response
+                                            
                                             logger::info("LspProcessConnection", &format!("Received LSP notification: {}", content_str));
-                                            // We could handle notifications here if needed
+                                            
                                             reading_headers = true;
                                             content_length = 0;
                                             continue;
                                         }
                                     }
                                     
-                                    // Otherwise, try to parse as a response
+                                    
                                     match serde_json::from_str::<JsonRpcResponse>(&content_str) {
                                         Ok(response) => {
                                             if let Some(id) = response.id.as_u64() {

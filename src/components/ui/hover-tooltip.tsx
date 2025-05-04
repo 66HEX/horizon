@@ -1,5 +1,3 @@
-"use client"
-
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
@@ -8,19 +6,31 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { AlertTriangle, Code, Book, Database, Package } from "lucide-react"
 
-// Definicja typów danych hover
-export type FormattedHoverData = {
+export type ContentType = 'function' | 'struct' | 'variable' | 'module' | 'generic'
+
+export type DocumentationMetadata = {
+  has_code_blocks: boolean
+  has_tables: boolean
+  has_lists: boolean
+  content_type: ContentType
+  warning_messages: string[]
+}
+
+export type EnhancedHoverData = {
   title: string
   signature: string | null
   documentation: string | null
   source_code: string | null
   raw: string
+  metadata: DocumentationMetadata
 }
 
-// Warianty stylu tooltipa
 const hoverVariants = cva(
-  "absolute z-50 max-w-md shadow-lg animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+  "absolute z-50 max-w-sm shadow-lg animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
   {
     variants: {
       variant: {
@@ -35,46 +45,59 @@ const hoverVariants = cva(
   }
 )
 
-interface HoverTooltipProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof hoverVariants> {
-  data: FormattedHoverData
+interface EnhancedHoverTooltipProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof hoverVariants> {
+  data: EnhancedHoverData
   position: { top: number; left: number }
   onClose?: () => void
   maxHeight?: number
   maxWidth?: number
 }
 
-const HoverTooltip = React.forwardRef<HTMLDivElement, HoverTooltipProps>(
-  ({ className, variant, data, position, onClose, maxHeight = 300, maxWidth = 500, ...props }, ref) => {
-    // Referencja do karty
+const getContentTypeIcon = (type: ContentType) => {
+  switch (type) {
+    case 'function':
+      return <Code className="w-4 h-4" />
+    case 'struct':
+      return <Database className="w-4 h-4" />
+    case 'variable':
+      return <Package className="w-4 h-4" />
+    case 'module':
+      return <Book className="w-4 h-4" />
+    default:
+      return null
+  }
+}
+
+const EnhancedHoverTooltip = React.forwardRef<HTMLDivElement, EnhancedHoverTooltipProps>(
+  ({ className, variant, data, position, onClose, maxHeight = 400, maxWidth = 600, ...props }, ref) => {
     const cardRef = React.useRef<HTMLDivElement>(null)
-    
-    // Rekalkulacja pozycji, aby tooltip nie wychodził poza ekran
     const [calculatedPosition, setCalculatedPosition] = React.useState(position)
-    
+
     React.useEffect(() => {
       if (cardRef.current) {
         const rect = cardRef.current.getBoundingClientRect()
         const viewportWidth = window.innerWidth
         const viewportHeight = window.innerHeight
+        const padding = 10
         
         let newLeft = position.left
         let newTop = position.top
         
-        // Sprawdź, czy tooltip wychodzi poza prawy brzeg ekranu
-        if (position.left + rect.width > viewportWidth) {
-          newLeft = Math.max(0, viewportWidth - rect.width - 10)
+        if (position.left + rect.width > viewportWidth - padding) {
+          newLeft = Math.max(padding, viewportWidth - rect.width - padding)
         }
         
-        // Sprawdź, czy tooltip wychodzi poza dolny brzeg ekranu
-        if (position.top + rect.height > viewportHeight) {
-          newTop = Math.max(0, position.top - rect.height)
+        if (position.top + rect.height > viewportHeight - padding) {
+          newTop = Math.max(padding, position.top - rect.height - padding)
         }
+        
+        newLeft = Math.max(padding, Math.min(newLeft, viewportWidth - rect.width - padding))
+        newTop = Math.max(padding, Math.min(newTop, viewportHeight - rect.height - padding))
         
         setCalculatedPosition({ top: newTop, left: newLeft })
       }
     }, [position, data])
-    
-    // Zamknij tooltip przy kliknięciu poza nim
+
     React.useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
         if (cardRef.current && !cardRef.current.contains(event.target as Node) && onClose) {
@@ -83,51 +106,53 @@ const HoverTooltip = React.forwardRef<HTMLDivElement, HoverTooltipProps>(
       }
       
       document.addEventListener('mousedown', handleClickOutside)
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside)
-      }
+      return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [onClose])
-    
-    // Styl dla kontenera Markdown
-    const markdownStyles = {
-      // Style dla nagłówków
-      h1: "text-xl font-semibold mt-2 mb-1",
-      h2: "text-lg font-semibold mt-2 mb-1",
-      h3: "text-base font-semibold mt-2 mb-1",
-      h4: "text-sm font-semibold mt-1 mb-1",
-      h5: "text-xs font-semibold mt-1 mb-1",
-      h6: "text-xs font-semibold mt-1 mb-1",
+
+    React.useEffect(() => {
+      const handleEscape = (event: KeyboardEvent) => {
+        if (event.key === 'Escape' && onClose) {
+          onClose()
+        }
+      }
       
-      // Style dla paragrafów i tekstu
-      p: "text-primary/90 my-1",
-      a: "text-primary/90 underline",
+      document.addEventListener('keydown', handleEscape)
+      return () => document.removeEventListener('keydown', handleEscape)
+    }, [onClose])
+
+    const markdownStyles = {
+      h1: "text-lg font-bold mt-3 mb-2",
+      h2: "text-base font-semibold mt-2 mb-1",
+      h3: "text-sm font-semibold mt-2 mb-1",
+      h4: "text-sm font-medium mt-1 mb-1",
+      h5: "text-xs font-medium mt-1 mb-1",
+      h6: "text-xs font-medium mt-1 mb-1",
+      
+      p: "text-sm text-primary/90 my-1",
+      a: "text-primary hover:text-primary/80",
       strong: "text-primary/90 font-bold",
       em: "text-primary/90 italic",
       
-      // Style dla list
-      ul: "text-primary/90 list-disc pl-4 my-1",
-      ol: "text-primary/90 list-decimal pl-4 my-1",
-      li: "text-primary/90 my-0.5",
+      ul: "text-sm text-primary/90 list-disc pl-4 my-1",
+      ol: "text-sm text-primary/90 list-decimal pl-4 my-1",
+      li: "text-sm text-primary/90 my-0.5",
       
-      // Style dla bloków kodu i inline kodu
-      pre: "bg-muted px-1 py-0.5 rounded my-2 overflow-x-auto inline",
-      code: "font-mono text-xs bg-muted px-1 py-0.5 rounded",
-      inlineCode: "font-mono text-xs bg-muted/80 px-1 py-0.5 rounded inline",
+      pre: "bg-muted/80 rounded my-2 p-2",
+      code: "font-mono text-xs bg-muted/80 px-1 py-0.5 rounded text-primary/50",
+      inlineCode: "font-mono text-xs bg-[#232323] px-1 py-0.5 rounded text-primary/50",
       
-      // Style dla innych elementów
-      blockquote: "border-l-2 border-muted pl-2 italic my-2",
-      hr: "border-t my-2",
+      blockquote: "border-l-2 border-primary/20 pl-3 italic my-2 text-primary/80",
+      hr: "border-t border-border my-2",
       
-      // Ulepszone style dla tabel
       tableWrapper: "overflow-x-auto my-2 rounded border border-border",
-      table: "w-full border-collapse text-xs",
-      thead: "bg-muted/50",
-      tbody: "text-primary/90 bg-background",
-      tr: "border-b border-border last:border-0",
-      th: "px-3 py-2 font-medium text-left border-r border-border last:border-r-0 whitespace-nowrap",
+      table: "w-full border-collapse text-xs border border-border",
+      thead: "bg-muted/30",
+      tbody: "text-primary/90",
+      tr: "border-b border-border",
+      th: "px-3 py-2 font-medium text-left border-r border-border last:border-r-0 bg-muted/50",
       td: "px-3 py-2 border-r border-border last:border-r-0 align-top",
     }
-    
+
     return (
       <div
         ref={ref}
@@ -140,72 +165,106 @@ const HoverTooltip = React.forwardRef<HTMLDivElement, HoverTooltipProps>(
         }}
         {...props}
       >
-        <Card ref={cardRef} className="max-w-md max-h-96 relative overflow-hidden">
-          <ScrollArea className="relative w-full max-h-96">
-            <div className="p-3 pb-3">
-              <h4 className="font-semibold text-sm">{data.title}</h4>
-              {data.signature && (
-                <pre className="mt-1 text-xs bg-muted p-1 rounded">
-                  <code>{data.signature}</code>
-                </pre>
-              )}
+        <Card ref={cardRef} className="max-w-sm overflow-hidden">
+          <ScrollArea className="relative w-full" style={{ maxHeight: `${maxHeight}px` }}>
+            <div className="p-3 pb-2 flex items-center gap-2">
+              {getContentTypeIcon(data.metadata.content_type)}
+              <h4 className="font-semibold text-sm flex-1 truncate">{data.title}</h4>
+              <span className="text-xs text-muted-foreground">
+                {data.metadata.content_type}
+              </span>
             </div>
+            
+            {data.metadata.warning_messages && data.metadata.warning_messages.length > 0 && (
+              <>
+                <Separator />
+                <div className="p-3">
+                  {data.metadata.warning_messages.map((message, index) => (
+                    <Alert key={index} variant="destructive" className="mb-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Warning</AlertTitle>
+                      <AlertDescription>{message}</AlertDescription>
+                    </Alert>
+                  ))}
+                </div>
+              </>
+            )}
             
             {data.documentation && (
               <>
                 <Separator />
-                <div className="text-xs markdown-content p-3 pb-3 max-w-md">
+                <div className="p-3 markdown-content">
                   <ReactMarkdown
                     components={{
-                      h1: ({ node, ...props }) => <h1 className={markdownStyles.h1} {...props} />,
-                      h2: ({ node, ...props }) => <h2 className={markdownStyles.h2} {...props} />,
-                      h3: ({ node, ...props }) => <h3 className={markdownStyles.h3} {...props} />,
-                      h4: ({ node, ...props }) => <h4 className={markdownStyles.h4} {...props} />,
-                      h5: ({ node, ...props }) => <h5 className={markdownStyles.h5} {...props} />,
-                      h6: ({ node, ...props }) => <h6 className={markdownStyles.h6} {...props} />,
-                      p: ({ node, ...props }) => <p className={markdownStyles.p} {...props} />,
-                      a: ({ node, ...props }) => <a className={markdownStyles.a} {...props} />,
-                      strong: ({ node, ...props }) => <strong className={markdownStyles.strong} {...props} />,
-                      em: ({ node, ...props }) => <em className={markdownStyles.em} {...props} />,
-                      ul: ({ node, ...props }) => <ul className={markdownStyles.ul} {...props} />,
-                      ol: ({ node, ...props }) => <ol className={markdownStyles.ol} {...props} />,
-                      li: ({ node, ...props }) => <li className={markdownStyles.li} {...props} />,
-                      pre: ({ node, ...props }) => <pre className={markdownStyles.pre} {...props} />,
-                      code: ({ node, inline, className, children, ...props }: any) => {
-                        // Extract language info if it exists (language-xxx in className)
-                        const match = /language-(\w+)/.exec(className || '');
-                        const language = match ? match[1] : '';
+                      h1: ({ children }) => <h1 className={markdownStyles.h1}>{children}</h1>,
+                      h2: ({ children }) => <h2 className={markdownStyles.h2}>{children}</h2>,
+                      h3: ({ children }) => <h3 className={markdownStyles.h3}>{children}</h3>,
+                      h4: ({ children }) => <h4 className={markdownStyles.h4}>{children}</h4>,
+                      h5: ({ children }) => <h5 className={markdownStyles.h5}>{children}</h5>,
+                      h6: ({ children }) => <h6 className={markdownStyles.h6}>{children}</h6>,
+                      p: ({ children }) => <p className={markdownStyles.p}>{children}</p>,
+                      a: ({ href, children }) => (
+                        <a 
+                          href={href} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className={markdownStyles.a}
+                        >
+                          {children}
+                        </a>
+                      ),
+                      img: ({ src, alt }) => {
+                        if (src?.includes('badge') || src?.includes('shield') || alt?.includes('badge')) {
+                          return (
+                            <img
+                              src={src}
+                              alt={alt || ''}
+                              className="inline-block mx-1 h-5 align-text-bottom"
+                              style={{ maxHeight: '20px' }}
+                            />
+                          );
+                        }
                         
-                        return !inline ? (
-                          <pre className={markdownStyles.pre}>
-                            <code 
-                              className={cn(className, language && `language-${language}`)} 
-                              data-language={language || undefined}
-                              {...props}
-                            >
-                              {children}
-                            </code>
-                          </pre>
-                        ) : (
-                          <code className={markdownStyles.inlineCode} {...props}>
-                            {children}
-                          </code>
-                        )
+                        return (
+                          <img
+                            src={src}
+                            alt={alt || ''}
+                            className="max-w-full my-2 rounded"
+                          />
+                        );
                       },
-                      blockquote: ({ node, ...props }) => <blockquote className={markdownStyles.blockquote} {...props} />,
-                      hr: ({ node, ...props }) => <hr className={markdownStyles.hr} {...props} />,
-                      table: ({ node, ...props }) => (
+                      strong: ({ children }) => <strong className={markdownStyles.strong}>{children}</strong>,
+                      em: ({ children }) => <em className={markdownStyles.em}>{children}</em>,
+                      ul: ({ children }) => <ul className={markdownStyles.ul}>{children}</ul>,
+                      ol: ({ children }) => <ol className={markdownStyles.ol}>{children}</ol>,
+                      li: ({ children }) => <li className={markdownStyles.li}>{children}</li>,
+                      code: ({ children }) => (
+                        <code className={markdownStyles.inlineCode}>
+                          {children}
+                        </code>
+                      ),
+                      pre: ({ children }) => (
+                        <pre className={markdownStyles.pre}>
+                          {children}
+                        </pre>
+                      ),
+                      blockquote: ({ children }) => <blockquote className={markdownStyles.blockquote}>{children}</blockquote>,
+                      hr: ({ children }) => <hr className={markdownStyles.hr}>{children}</hr>,
+                      table: ({ children }) => (
                         <div className={markdownStyles.tableWrapper}>
-                          <table className={markdownStyles.table} {...props} />
+                          <table className={markdownStyles.table}>
+                            {children}
+                          </table>
                         </div>
                       ),
-                      thead: ({ node, ...props }) => <thead className={markdownStyles.thead} {...props} />,
-                      tbody: ({ node, ...props }) => <tbody className={markdownStyles.tbody} {...props} />,
-                      tr: ({ node, ...props }) => <tr className={markdownStyles.tr} {...props} />,
-                      th: ({ node, ...props }) => <th scope="col" className={markdownStyles.th} {...props} />,
-                      td: ({ node, ...props }) => <td className={markdownStyles.td} {...props} />,
+                      thead: ({ children }) => <thead className={markdownStyles.thead}>{children}</thead>,
+                      tbody: ({ children }) => <tbody className={markdownStyles.tbody}>{children}</tbody>,
+                      tr: ({ children }) => <tr className={markdownStyles.tr}>{children}</tr>,
+                      th: ({ children }) => <th className={markdownStyles.th}>{children}</th>,
+                      td: ({ children }) => <td className={markdownStyles.td}>{children}</td>,
                     }}
                     remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeRaw]}
                   >
                     {data.documentation}
                   </ReactMarkdown>
@@ -213,12 +272,26 @@ const HoverTooltip = React.forwardRef<HTMLDivElement, HoverTooltipProps>(
               </>
             )}
             
-            {data.source_code && (
+            
+            {/* Debug info in development mode */}
+            {process.env.NODE_ENV === 'development' && (
               <>
                 <Separator />
-                <pre className="text-xs p-3 max-w-md">
-                  <code>{data.source_code}</code>
-                </pre>
+                <div className="p-3 bg-muted/10">
+                  <details className="text-xs">
+                    <summary className="cursor-pointer font-medium mb-1">Debug Info</summary>
+                    <pre className="bg-muted/20 p-2 rounded overflow-x-auto whitespace-pre-wrap">
+                      {JSON.stringify({
+                        ...data.metadata,
+                        title: data.title,
+                        signature_length: data.signature?.length,
+                        doc_length: data.documentation?.length,
+                        code_length: data.source_code?.length,
+                        raw_preview: data.raw.substring(0, 100) + '...'
+                      }, null, 2)}
+                    </pre>
+                  </details>
+                </div>
               </>
             )}
           </ScrollArea>
@@ -228,6 +301,6 @@ const HoverTooltip = React.forwardRef<HTMLDivElement, HoverTooltipProps>(
   }
 )
 
-HoverTooltip.displayName = "HoverTooltip"
+EnhancedHoverTooltip.displayName = "EnhancedHoverTooltip"
 
-export { HoverTooltip } 
+export { EnhancedHoverTooltip }

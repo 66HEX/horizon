@@ -1,40 +1,40 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./App.css";
 import { FileContextProvider } from "./lib/file-context";
 import { useLspStore } from "./lib/lsp-store";
 
-// Komponent inicjalizujący LSP przy starcie
+
 function LspInitializer() {
   const { startLspWebSocketServer, isWebSocketRunning, stopLspWebSocketServer } = useLspStore();
   
   useEffect(() => {
-    // Port początkowy dla serwera WebSocket LSP
+    
     const LSP_WEBSOCKET_PORT = 1520;
     
     const setupLspServer = async () => {
       try {
-        // Sprawdź, czy serwer jest już uruchomiony
+        
         if (!isWebSocketRunning) {
-          console.log(`Inicjowanie serwera WebSocket LSP na porcie ${LSP_WEBSOCKET_PORT}...`);
+          console.log(`Initializing LSP WebSocket server on port ${LSP_WEBSOCKET_PORT}...`);
           await startLspWebSocketServer(LSP_WEBSOCKET_PORT);
         } else {
-          console.log('Serwer WebSocket LSP już uruchomiony');
+          console.log('LSP WebSocket server already running');
         }
       } catch (err) {
-        console.error('Błąd inicjalizacji serwera LSP WebSocket:', err);
+        console.error('Error initializing LSP WebSocket server:', err);
       }
     };
     
     setupLspServer();
     
-    // Czyszczenie przy odmontowaniu komponentu
+    
     return () => {
-      // Zatrzymaj serwer WebSocket gdy aplikacja jest zamykana
+      
       if (isWebSocketRunning) {
         stopLspWebSocketServer()
-          .catch(err => console.error('Błąd przy zatrzymywaniu serwera WebSocket LSP:', err));
+          .catch(err => console.error('Error stopping LSP WebSocket server:', err));
       }
     };
   }, [startLspWebSocketServer, stopLspWebSocketServer, isWebSocketRunning]);

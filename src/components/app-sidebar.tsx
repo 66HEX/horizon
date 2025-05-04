@@ -51,7 +51,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     closeCreateDialog
   } = useFileContext();
   
-  // Get diagnostics from LSP store
+  
   const { diagnostics, currentFilePath } = useLspStore();
   
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -62,7 +62,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const searchingIndicatorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [activeTab, setActiveTab] = useState<string>("files");
 
-  // Calculate diagnostics summary for badge display
+  
   const diagnosticSummary = React.useMemo(() => {
     const errorCount = diagnostics.filter(d => d.severity === 'error').length;
     const warningCount = diagnostics.filter(d => d.severity === 'warning').length;
@@ -535,25 +535,25 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
 
   const hasClipboardContent = clipboard.path !== null && clipboard.type !== null;
 
-  // Effect to load contents when expanded
+  
   useEffect(() => {
     if (item.isDirectory && isExpanded && (item.needsLoading || !item.children || item.children.length === 0)) {
-      // Set local loading state
+      
       setIsLocalLoading(true);
       setLocalChildren(null);
       
-      // Call backend service 
+      
       const loadContents = async () => {
         try {
           loadDirectoryContents(item.path, item);
           
-          // Direct load from file service
+          
           const fileService = new FileService();
           const contents = await fileService.loadDirectoryContents(item.path);
           if (contents && contents.length > 0) {
             setLocalChildren(contents);
           } else {
-            // Empty directory - set empty array to indicate we have loaded
+            
             setLocalChildren([]);
           }
           
@@ -561,7 +561,7 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
         } catch (error) {
           console.error('Error loading contents:', error);
           setIsLocalLoading(false);
-          // Set empty array to avoid infinite loading
+          
           setLocalChildren([]);
         }
       };
@@ -600,12 +600,9 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
     setContextMenuPosition(null);
   };
   
-  // Determine loading state - use only local state if we've tried to load
+  
   const isLoading = localChildren === null ? isLocalLoading : false;
-  
-  // Use local children if available
-  const children = localChildren || item.children;
-  
+    
   return (
     <div className="pl-1 max-w-[16rem]">
       <DropdownMenu

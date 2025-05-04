@@ -1,5 +1,3 @@
-"use client"
-
 import { useEffect, useRef, useState } from "react"
 import { EditorState, StateEffect } from "@codemirror/state"
 import { javascript } from "@codemirror/lang-javascript"
@@ -21,7 +19,7 @@ import { less } from "@codemirror/lang-less"
 import { yaml } from "@codemirror/lang-yaml"
 import { indentWithTab } from "@codemirror/commands"
 import { lintKeymap, linter, Diagnostic as CMDiagnostic } from "@codemirror/lint"
-import { EditorView, keymap, hoverTooltip, Tooltip } from "@codemirror/view"
+import { EditorView, keymap, hoverTooltip } from "@codemirror/view"
 import { searchKeymap } from "@codemirror/search"
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language"
 import { tags as t } from "@lezer/highlight"
@@ -30,11 +28,10 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands"
 import { lineNumbers, highlightActiveLineGutter } from "@codemirror/view"
 import { bracketMatching, foldGutter } from "@codemirror/language"
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete"
-import { useLspStore, CompletionItem as LspCompletionItem, DiagnosticItem } from "@/lib/lsp-store"
+import { useLspStore, CompletionItem as LspCompletionItem, DiagnosticItem, EnhancedHoverData } from "@/lib/lsp-store"
 import { invoke } from "@tauri-apps/api/core"
-import { HoverTooltip } from "./ui/hover-tooltip"
+import { EnhancedHoverTooltip } from "./ui/hover-tooltip"
 import { createPortal } from "react-dom"
-import React from "react"
 
 const shadcnTheme = EditorView.theme({
   "&": {
@@ -223,12 +220,12 @@ export function CodeEditor({
   
   
   const [hoverState, setHoverState] = useState<{
-    data: any;
+    data: EnhancedHoverData;
     pos: { top: number; left: number };
     isVisible: boolean;
   } | null>(null);
 
-  const showHover = (data: any, pos: { top: number; left: number }) => {
+  const showHover = (data: EnhancedHoverData, pos: { top: number; left: number }) => {
     setHoverState({ data, pos, isVisible: true });
   };
 
@@ -394,23 +391,19 @@ export function CodeEditor({
       
       const hoverInfo = await getHoverInfo(filePath, lspPosition);
       
-      if (!hoverInfo) {
+      if (!hoverInfo || !hoverInfo.enhancedContents) {
         return null;
       }
       
-      if (hoverInfo.formattedContents) {
-        const posCoords = view.coordsAtPos(pos);
-        if (posCoords) {
-          
-          setTimeout(() => {
-            showHoverFn(hoverInfo.formattedContents, {
-              top: posCoords.top + 20,
-              left: posCoords.left
-            });
-          }, 0);
-        }
+      const posCoords = view.coordsAtPos(pos);
+      if (posCoords && hoverInfo.enhancedContents) {
+        setTimeout(() => {
+          showHoverFn(hoverInfo.enhancedContents as EnhancedHoverData, {
+            top: posCoords.top + 20,
+            left: posCoords.left
+          });
+        }, 0);
       }
-      
       
       return null;
     }, {
@@ -533,6 +526,19 @@ export function CodeEditor({
     }
   }
 
+  // Render EnhancedHoverTooltip only
+  const renderHoverTooltip = () => {
+    if (!hoverState?.isVisible) return null;
+    
+    return (
+      <EnhancedHoverTooltip 
+        data={hoverState.data}
+        position={hoverState.pos}
+        onClose={hideHover}
+      />
+    );
+  };
+
   return (
     <div className={cn("relative h-full w-full rounded-md border", className)} data-editor-container>
       <ScrollArea className="h-full w-full">
@@ -540,13 +546,9 @@ export function CodeEditor({
       </ScrollArea>
       
       {hoverState?.isVisible && createPortal(
-        <HoverTooltip 
-          data={hoverState.data}
-          position={hoverState.pos}
-          onClose={hideHover}
-        />,
+        renderHoverTooltip(),
         document.body
       )}
     </div>
   )
-} 
+}

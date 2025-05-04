@@ -1765,6 +1765,7 @@ dependencies = [
  "libc",
  "lsp-types 0.97.0",
  "nix",
+ "once_cell",
  "parking_lot",
  "regex",
  "serde",
