@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input"
 import { DirectoryItem } from "@/lib/file-service"
 import { useFileContext } from "@/lib/file-context"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { ScrollArea } from "./ui/scroll-area"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,10 +23,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu"
-import { RenameDialog } from "./rename-dialog"
-import { CreateDialog } from "./create-dialog"
+import { RenameDialog } from "@/components/rename-dialog"
+import { CreateDialog } from "@/components/create-dialog"
 import { FileService } from "@/lib/file-service"
-import { useLspStore } from "@/lib/lsp-store"
+import { useLspStore } from "@/lib/stores/lsp-store"
 import { Badge } from "@/components/ui/badge"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -241,7 +241,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </button>
             <button
               onClick={() => setActiveTab("diagnostics")}
-              className={`p-2 rounded-md mb-2 cursor-pointer relative ${activeTab === "diagnostics" ? "bg-sidebar-accent/20" : "hover:bg-sidebar-accent/10"}`}
+              className={`p-2 rounded-md mb-2 cursor-pointer relative ${activeTab === "diagnostics" ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/50"}`}
             >
               <IconAlertTriangle className="h-4 w-4" />
               {diagnosticSummary.total > 0 && (

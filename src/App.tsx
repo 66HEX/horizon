@@ -6,17 +6,17 @@ import {
     SidebarProvider,
     useSidebar
 } from "@/components/ui/sidebar"
-import { CodeEditor } from "./components/code-editor"
-import { FileInfo } from "./lib/file-service"
+import { CodeEditor } from "@/components/code-editor"
+import { FileInfo } from "@/lib/file-service"
 import { ImageViewer } from "@/components/image-viewer"
 import { convertFileSrc } from "@tauri-apps/api/core"
-import Terminal from "./components/terminal"
+import Terminal from "@/components/terminal"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
 import { Button } from "@/components/ui/button"
 import { FileSelectionTabs } from "@/components/ui/file-selection-tabs"
 import { IconLayoutSidebar, IconLayoutBottombar, IconLayoutSidebarFilled, IconLayoutBottombarFilled } from "@tabler/icons-react"
 import { AudioPlayer } from "@/components/audio-player.tsx"
-import { useFileStore } from "@/lib/stores"
+import { useFileStore } from "@/lib/stores/file-store"
 
 interface TerminalInstance {
   id: string;

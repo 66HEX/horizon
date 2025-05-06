@@ -1,10 +1,9 @@
 import { useEffect } from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";
-import "./App.css";
-import { FileContextProvider } from "./lib/file-context";
-import { useLspStore } from "./lib/lsp-store";
-
+import App from "@/App";
+import "@/App.css";
+import { FileContextProvider } from "@/lib/file-context";
+import { useLspStore } from "@/lib/stores/lsp-store";
 
 function LspInitializer() {
   const { startLspWebSocketServer, isWebSocketRunning, stopLspWebSocketServer } = useLspStore();

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { EditorState, StateEffect } from "@codemirror/state"
 import { javascript } from "@codemirror/lang-javascript"
 import { cn } from "@/lib/utils"
-import { autocompletion, completionKeymap, CompletionContext, CompletionResult } from "@codemirror/autocomplete"
+import { autocompletion, completionKeymap, CompletionContext } from "@codemirror/autocomplete"
 import { html } from "@codemirror/lang-html"
 import { css } from "@codemirror/lang-css"
 import { python } from "@codemirror/lang-python"
@@ -23,14 +23,14 @@ import { EditorView, keymap, hoverTooltip } from "@codemirror/view"
 import { searchKeymap } from "@codemirror/search"
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language"
 import { tags as t } from "@lezer/highlight"
-import { ScrollArea } from "./ui/scroll-area"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands"
 import { lineNumbers, highlightActiveLineGutter } from "@codemirror/view"
 import { bracketMatching, foldGutter } from "@codemirror/language"
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete"
-import { useLspStore, CompletionItem as LspCompletionItem, DiagnosticItem, EnhancedHoverData } from "@/lib/lsp-store"
+import { useLspStore, DiagnosticItem, EnhancedHoverData } from "@/lib/stores/lsp-store"
 import { invoke } from "@tauri-apps/api/core"
-import { EnhancedHoverTooltip } from "./ui/hover-tooltip"
+import { EnhancedHoverTooltip } from "@/components/ui/hover-tooltip"
 import { createPortal } from "react-dom"
 
 const shadcnTheme = EditorView.theme({
@@ -526,7 +526,6 @@ export function CodeEditor({
     }
   }
 
-  // Render EnhancedHoverTooltip only
   const renderHoverTooltip = () => {
     if (!hoverState?.isVisible) return null;
     
