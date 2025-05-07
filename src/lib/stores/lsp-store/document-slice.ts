@@ -40,10 +40,14 @@ export const createDocumentSlice: StateCreator<
    * @param language - Language of the current file or null
    */
   setCurrentFile: (filePath, language) => {
+    const { filesDiagnostics } = get();
+    
+    const fileDiagnostics = filePath ? filesDiagnostics[filePath] || [] : [];
+    
     set({ 
       currentFilePath: filePath, 
       currentLanguage: language,
-      diagnostics: [] 
+      diagnostics: fileDiagnostics
     });
   },
   
@@ -55,7 +59,7 @@ export const createDocumentSlice: StateCreator<
    * @returns Promise that resolves when document is opened
    */
   openDocument: async (filePath: string, language: string, content: string) => {
-    const { isServerRunning, webSocketClient, currentLanguage } = get();
+    const { isServerRunning, webSocketClient, currentLanguage, filesDiagnostics } = get();
     
     if (!isServerRunning || !webSocketClient) {
       throw new Error('LSP server is not running');
@@ -68,9 +72,14 @@ export const createDocumentSlice: StateCreator<
       set({ isLoading: true });
       
       await webSocketClient.notifyDocumentOpened(filePath, language || currentLanguage || 'plaintext', content);
+      
+      // Get existing diagnostics for this file, if any
+      const fileDiagnostics = filesDiagnostics[filePath] || [];
+      
       set({ 
         currentFilePath: filePath, 
         currentLanguage: language || currentLanguage,
+        diagnostics: fileDiagnostics,
         isLoading: false
       });
     } catch (error) {

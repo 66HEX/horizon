@@ -21,6 +21,7 @@ export interface FeaturesSlice {
    */
   completions: CompletionItem[];
   diagnostics: DiagnosticItem[];
+  filesDiagnostics: Record<string, DiagnosticItem[]>;
   
   /**
    * Feature action methods
@@ -47,6 +48,7 @@ export const createFeaturesSlice: StateCreator<
    */
   completions: [],
   diagnostics: [],
+  filesDiagnostics: {},
   
   /**
    * Get code completions from the language server
@@ -93,13 +95,14 @@ export const createFeaturesSlice: StateCreator<
    * @returns Promise that resolves to diagnostic items
    */
   getDiagnostics: async (filePath) => {
-    const { isServerRunning, currentLanguage, webSocketClient, diagnostics } = get();
+    const { isServerRunning, currentLanguage, webSocketClient, filesDiagnostics } = get();
     
     if (!isServerRunning || !currentLanguage || !webSocketClient) {
       return [];
     }
     
-    return diagnostics;
+    // Return diagnostics for the specified file path
+    return filesDiagnostics[filePath] || [];
   },
   
   /**

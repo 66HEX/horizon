@@ -26,7 +26,7 @@ import {
 import { RenameDialog } from "@/components/rename-dialog"
 import { CreateDialog } from "@/components/create-dialog"
 import { FileService } from "@/lib/file-service"
-import { useLspStore } from "@/lib/stores/lsp-store"
+import { useLspStore, DiagnosticItem } from "@/lib/stores/lsp-store"
 import { Badge } from "@/components/ui/badge"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -52,7 +52,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   } = useFileContext();
   
   
-  const { diagnostics, currentFilePath } = useLspStore();
+  const { diagnostics, currentFilePath, filesDiagnostics } = useLspStore();
   
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [searchResults, setSearchResults] = useState<DirectoryItem[]>([]);
@@ -64,9 +64,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   
   const diagnosticSummary = React.useMemo(() => {
-    const errorCount = diagnostics.filter(d => d.severity === 'error').length;
-    const warningCount = diagnostics.filter(d => d.severity === 'warning').length;
-    const infoCount = diagnostics.filter(d => d.severity === 'information' || d.severity === 'hint').length;
+    // Count all errors, warnings and infos across all files
+    let errorCount = 0;
+    let warningCount = 0;
+    let infoCount = 0;
+
+    Object.values(filesDiagnostics).forEach((fileDiagnostics: DiagnosticItem[]) => {
+      errorCount += fileDiagnostics.filter(d => d.severity === 'error').length;
+      warningCount += fileDiagnostics.filter(d => d.severity === 'warning').length;
+      infoCount += fileDiagnostics.filter(d => d.severity === 'information' || d.severity === 'hint').length;
+    });
     
     return {
       errorCount,
@@ -74,7 +81,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       infoCount,
       total: errorCount + warningCount + infoCount
     };
-  }, [diagnostics]);
+  }, [filesDiagnostics]);
 
   useEffect(() => {
     const handleToggleSidebar = () => {
@@ -438,51 +445,93 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <SidebarGroupContent className="relative overflow-hidden h-full">
                   <ScrollArea className="absolute inset-0 w-full h-full" type="auto" scrollHideDelay={400}>
                     <SidebarMenu>
-                      {!currentFilePath ? (
+                      {!currentFilePath && Object.keys(filesDiagnostics).length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full px-2 text-center text-muted-foreground">
-                          <p className="text-xs mt-2">Open a file to view diagnostics</p>
+                          <p className="text-xs mt-2">No diagnostics available</p>
                         </div>
-                      ) : diagnostics.length > 0 ? (
+                      ) : diagnosticSummary.total > 0 ? (
                         <div className="p-1">
-                          {diagnostics.map((diagnostic, index) => (
-                            <div 
-                              key={`diagnostic-${index}`} 
-                              className="p-2 mb-1 text-xs rounded-md hover:bg-sidebar-accent/10 cursor-pointer border-l-2 border-l-transparent hover:border-l-sidebar-accent transition-colors"
-                              style={{
-                                borderLeftColor: diagnostic.severity === 'error' 
-                                  ? 'var(--destructive)' 
-                                  : diagnostic.severity === 'warning' 
-                                    ? 'var(--warning)' 
-                                    : 'var(--muted)'
-                              }}
-                            >
-                              <div className="flex items-start gap-2">
-                                <div className="flex-shrink-0 mt-0.5">
-                                  {diagnostic.severity === 'error' ? (
-                                    <IconAlertTriangle className="h-3.5 w-3.5 text-destructive" />
-                                  ) : diagnostic.severity === 'warning' ? (
-                                    <IconAlertTriangle className="h-3.5 w-3.5 text-warning" />
-                                  ) : (
-                                    <IconAlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />
-                                  )}
+                          {/* Group diagnostics by file */}
+                          {Object.entries(filesDiagnostics).map(([filePath, fileDiagnostics]: [string, DiagnosticItem[]]) => {
+                            if (fileDiagnostics.length === 0) return null;
+                            
+                            // Extract file name from path
+                            const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || filePath;
+                            
+                            return (
+                              <div key={`file-${filePath}`} className="mb-3">
+                                <div className="flex items-center px-2 py-1 text-xs font-medium border-b border-sidebar-border/20">
+                                  <IconFile className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
+                                  <span 
+                                    className="cursor-pointer hover:text-primary transition-colors truncate"
+                                    onClick={() => filePath && openFileFromPath(filePath)}
+                                  >
+                                    {fileName}
+                                  </span>
+                                  <Badge className="ml-2" variant={
+                                    fileDiagnostics.some((d: DiagnosticItem) => d.severity === 'error') ? "destructive" :
+                                    fileDiagnostics.some((d: DiagnosticItem) => d.severity === 'warning') ? "warning" : "default"
+                                  }>
+                                    {fileDiagnostics.length}
+                                  </Badge>
                                 </div>
-                                <div className="flex-grow">
-                                  <div className="font-medium mb-0.5">
-                                    {diagnostic.message}
+                                {fileDiagnostics.map((diagnostic, index) => (
+                                  <div 
+                                    key={`diagnostic-${filePath}-${index}`} 
+                                    className="p-2 mb-1 text-xs rounded-md hover:bg-sidebar-accent/10 cursor-pointer border-l-2 border-l-transparent hover:border-l-sidebar-accent transition-colors"
+                                    style={{
+                                      borderLeftColor: diagnostic.severity === 'error' 
+                                        ? 'var(--destructive)' 
+                                        : diagnostic.severity === 'warning' 
+                                          ? 'var(--warning)' 
+                                          : 'var(--muted)'
+                                    }}
+                                    onClick={() => {
+                                      // Open the file and navigate to the diagnostic location
+                                      if (filePath) {
+                                        openFileFromPath(filePath).then(() => {
+                                          // Navigate to the specific location
+                                          const event = new CustomEvent('navigate-to-position', {
+                                            detail: {
+                                              line: diagnostic.range.start.line,
+                                              character: diagnostic.range.start.character
+                                            }
+                                          });
+                                          window.dispatchEvent(event);
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    <div className="flex items-start gap-2">
+                                      <div className="flex-shrink-0 mt-0.5">
+                                        {diagnostic.severity === 'error' ? (
+                                          <IconAlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                                        ) : diagnostic.severity === 'warning' ? (
+                                          <IconAlertTriangle className="h-3.5 w-3.5 text-warning" />
+                                        ) : (
+                                          <IconAlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />
+                                        )}
+                                      </div>
+                                      <div className="flex-grow">
+                                        <div className="font-medium mb-0.5">
+                                          {diagnostic.message}
+                                        </div>
+                                        <div className="text-muted-foreground">
+                                          Line {diagnostic.range.start.line + 1}, Column {diagnostic.range.start.character + 1}
+                                        </div>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div className="text-muted-foreground">
-                                    Line {diagnostic.range.start.line + 1}, Column {diagnostic.range.start.character + 1}
-                                  </div>
-                                </div>
+                                ))}
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="flex flex-col items-center justify-center h-full px-2 text-center text-muted-foreground">
                           <IconAlertTriangle className="h-10 w-10 mb-2 text-muted-foreground opacity-20" />
                           <p className="text-sm">No diagnostics found</p>
-                          <p className="text-xs mt-1">The current file has no errors or warnings</p>
+                          <p className="text-xs mt-1">No errors or warnings were detected</p>
                         </div>
                       )}
                     </SidebarMenu>

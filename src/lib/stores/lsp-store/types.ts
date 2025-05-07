@@ -153,6 +153,7 @@ export interface LspStoreState {
    */
   completions: CompletionItem[];
   diagnostics: DiagnosticItem[];
+  filesDiagnostics: Record<string, DiagnosticItem[]>;
   
   /**
    * UI slice state properties

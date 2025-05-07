@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
-import { LspStoreState } from '@/lib/stores/lsp-store/types';
+import { LspStoreState, DiagnosticItem } from '@/lib/stores/lsp-store/types';
 
 /**
  * Interface for WebSocket client that communicates with the LSP server
@@ -789,6 +789,7 @@ export interface ConnectionSlice {
   webSocketClient: LspWebSocketClient | null;
   currentLanguage: string | null;
   rootPath: string | null;
+  filesDiagnostics: Record<string, DiagnosticItem[]>;
   
   /**
    * Connection action methods
@@ -818,6 +819,7 @@ export const createConnectionSlice: StateCreator<
   webSocketClient: null,
   currentLanguage: null,
   rootPath: null,
+  filesDiagnostics: {},
   
   /**
    * Start the LSP WebSocket server
@@ -964,12 +966,24 @@ export const createConnectionSlice: StateCreator<
         
         console.log(`Processed ${diagnosticItems.length} diagnostics for ${filePath}`);
         
-        const { currentFilePath } = get();
+        const { currentFilePath, filesDiagnostics } = get();
+        
+        // Store diagnostics by file path
+        const updatedFilesDiagnostics = {
+          ...filesDiagnostics,
+          [filePath]: diagnosticItems
+        };
+        
+        // Update the diagnostics for the current file and the filesDiagnostics map
         if (currentFilePath === filePath) {
-          set({ diagnostics: diagnosticItems });
-          console.log('Updated diagnostics in store');
+          set({ 
+            diagnostics: diagnosticItems,
+            filesDiagnostics: updatedFilesDiagnostics
+          });
+          console.log('Updated diagnostics in store for current file');
         } else {
-          console.log(`Ignoring diagnostics for ${filePath}, current file is ${currentFilePath}`);
+          set({ filesDiagnostics: updatedFilesDiagnostics });
+          console.log(`Stored diagnostics for ${filePath}, current file is ${currentFilePath}`);
         }
       });
       
