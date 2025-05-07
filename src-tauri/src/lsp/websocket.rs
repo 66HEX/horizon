@@ -6,6 +6,7 @@ use warp::ws::{Message, WebSocket};
 use warp::Filter;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_stream::wrappers::TcpListenerStream;
+use dashmap::DashMap;
 
 use crate::lsp::server_factory::ServerFactory;
 use crate::lsp::get_supported_languages;
@@ -16,6 +17,7 @@ use anyhow::Result;
 pub struct WebSocketManager {
     server_factory: ServerFactory,
     clients: Arc<Mutex<Vec<mpsc::UnboundedSender<Message>>>>,
+    active_diagnostics: Arc<DashMap<String, Vec<DiagnosticItem>>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -87,6 +89,7 @@ impl WebSocketManager {
         Self {
             server_factory: ServerFactory::new(),
             clients: Arc::new(Mutex::new(Vec::new())),
+            active_diagnostics: Arc::new(DashMap::new()),
         }
     }
     
@@ -601,7 +604,81 @@ impl WebSocketManager {
                                         
                                         return Ok(Message::text(""));
                                     } else {
-                                        logger::error("WebSocketManager", "Received didOpen, but server is not initialized");
+                                        logger::error("WebSocketManager", "Received didOpen notification, but no active server");
+                                        return Ok(Message::text(""));
+                                    }
+                                },
+                                
+                                "textDocument/didChange" => {
+                                    logger::info("WebSocketManager", "Received didChange notification");
+                                    
+                                    let mut file_uri = "".to_string();
+                                    let mut has_content = false;
+                                    
+                                    if let Some(params) = json_rpc.get("params") {
+                                        if let Some(text_doc) = params.get("textDocument") {
+                                            if let Some(uri) = text_doc.get("uri") {
+                                                if let Some(uri_str) = uri.as_str() {
+                                                    logger::info("WebSocketManager", &format!("Document URI in didChange: {}", uri_str));
+                                                    file_uri = uri_str.to_string();
+                                                }
+                                            }
+                                        }
+                                        
+                                        if let Some(changes) = params.get("contentChanges") {
+                                            if let Some(changes_array) = changes.as_array() {
+                                                if !changes_array.is_empty() {
+                                                    has_content = true;
+                                                    if let Some(first_change) = changes_array.first() {
+                                                        if let Some(text) = first_change.get("text") {
+                                                            if let Some(text_str) = text.as_str() {
+                                                                let text_length = text_str.len();
+                                                                logger::info("WebSocketManager", &format!("Content change length: {} bytes", text_length));
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
+                                    if !has_content {
+                                        logger::warn("WebSocketManager", "No content changes found in didChange notification");
+                                    }
+                                    
+                                    if let Some(server_id) = active_server {
+                                        logger::info("WebSocketManager", &format!("Forwarding didChange to server: {}", server_id));
+                                        let forward_result = server_factory.forward_request(server_id, text).await;
+                                        
+                                        match forward_result {
+                                            Ok(_) => {
+                                                logger::info("WebSocketManager", "Successfully forwarded didChange notification");
+                                            },
+                                            Err(e) => {
+                                                logger::error("WebSocketManager", &format!("Error forwarding didChange: {}", e));
+                                            }
+                                        }
+                                        
+                                        return Ok(Message::text(""));
+                                    } else {
+                                        logger::error("WebSocketManager", "Received didChange notification, but no active server");
+                                        return Ok(Message::text(""));
+                                    }
+                                },
+                                
+                                "textDocument/didSave" => {
+                                    logger::info("WebSocketManager", "Received didSave notification");
+                                    
+                                    if let Some(server_id) = active_server {
+                                        let forward_result = server_factory.forward_request(server_id, text).await;
+                                        
+                                        if let Err(e) = forward_result {
+                                            logger::error("WebSocketManager", &format!("Error forwarding didSave: {}", e));
+                                        }
+                                        
+                                        return Ok(Message::text(""));
+                                    } else {
+                                        logger::error("WebSocketManager", "Received didSave notification, but no active server");
                                         return Ok(Message::text(""));
                                     }
                                 },
@@ -780,6 +857,121 @@ impl WebSocketManager {
             }
         }
     }
+
+    pub async fn register_client_for_diagnostics(&self, file_path: &str, server_id: &str, sender: mpsc::UnboundedSender<Message>) -> Result<()> {
+        logger::info("WebSocketManager", &format!("Registering client for diagnostics for: {}", file_path));
+        
+        let diagnostics_handler = {
+            let clients = self.clients.clone();
+            let file_path_str = file_path.to_string();
+            let active_diagnostics = self.active_diagnostics.clone();
+            
+            move |params: serde_json::Value| {
+                let clients_clone = clients.clone();
+                let file_path_clone = file_path_str.clone();
+                let active_diagnostics_clone = active_diagnostics.clone();
+                
+                tokio::spawn(async move {
+                    logger::info("WebSocketManager", &format!("Received publishDiagnostics notification for file: {}", file_path_clone));
+                    
+                    let uri = match params.get("uri").and_then(|v| v.as_str()) {
+                        Some(uri_str) => uri_str.to_string(),
+                        None => {
+                            logger::error("WebSocketManager", "Missing URI in publishDiagnostics notification");
+                            return;
+                        }
+                    };
+                    
+                    let diagnostics = match params.get("diagnostics").and_then(|v| v.as_array()) {
+                        Some(diags) => diags,
+                        None => {
+                            logger::error("WebSocketManager", "Missing diagnostics array in publishDiagnostics notification");
+                            return;
+                        }
+                    };
+                    
+                    let mut mapped_diagnostics: Vec<DiagnosticItem> = Vec::new();
+                    
+                    for diag in diagnostics {
+                        if let (Some(message), Some(severity), Some(range)) = (
+                            diag.get("message").and_then(|m| m.as_str()),
+                            diag.get("severity").and_then(|s| s.as_u64()),
+                            diag.get("range")
+                        ) {
+                            if let (Some(start), Some(end)) = (range.get("start"), range.get("end")) {
+                                if let (
+                                    Some(start_line), 
+                                    Some(start_char), 
+                                    Some(end_line), 
+                                    Some(end_char)
+                                ) = (
+                                    start.get("line").and_then(|l| l.as_u64()),
+                                    start.get("character").and_then(|c| c.as_u64()),
+                                    end.get("line").and_then(|l| l.as_u64()),
+                                    end.get("character").and_then(|c| c.as_u64())
+                                ) {
+                                    let severity_str = match severity {
+                                        1 => "error",
+                                        2 => "warning",
+                                        3 => "information",
+                                        4 => "hint",
+                                        _ => "error"
+                                    };
+                                    
+                                    mapped_diagnostics.push(DiagnosticItem {
+                                        message: message.to_string(),
+                                        severity: severity_str.to_string(),
+                                        range: Range {
+                                            start: Position {
+                                                line: start_line as u32,
+                                                character: start_char as u32
+                                            },
+                                            end: Position {
+                                                line: end_line as u32,
+                                                character: end_char as u32
+                                            }
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    
+                    logger::info("WebSocketManager", &format!("Mapped {} diagnostics for {}", mapped_diagnostics.len(), uri));
+                    
+                    active_diagnostics_clone.insert(uri.clone(), mapped_diagnostics.clone());
+                    
+                    let diagnostics_notification = serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "method": "textDocument/publishDiagnostics",
+                        "params": {
+                            "uri": uri,
+                            "diagnostics": mapped_diagnostics
+                        }
+                    });
+                    
+                    // Broadcast diagnostics to all connected clients
+                    let notification_text = serde_json::to_string(&diagnostics_notification)
+                        .unwrap_or_else(|_| "{}".to_string());
+                    
+                    let message = Message::text(notification_text);
+                    
+                    let clients = clients_clone.lock().await;
+                    for client in clients.iter() {
+                        if let Err(e) = client.send(message.clone()) {
+                            logger::error("WebSocketManager", &format!("Failed to send diagnostics notification to client: {}", e));
+                        }
+                    }
+                });
+            }
+        };
+        
+        // Register the handler with the server factory
+        let server_proxy = self.server_factory.get_server_proxy(server_id)?;
+        server_proxy.register_notification_handler("textDocument/publishDiagnostics", Box::new(diagnostics_handler)).await?;
+        
+        Ok(())
+    }
 }
 
 impl Clone for ServerFactory {
@@ -793,6 +985,7 @@ impl Clone for WebSocketManager {
         Self {
             server_factory: self.server_factory.clone(),
             clients: self.clients.clone(),
+            active_diagnostics: self.active_diagnostics.clone(),
         }
     }
 } 

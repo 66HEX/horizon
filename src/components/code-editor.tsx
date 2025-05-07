@@ -28,7 +28,7 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands"
 import { lineNumbers, highlightActiveLineGutter } from "@codemirror/view"
 import { bracketMatching, foldGutter } from "@codemirror/language"
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete"
-import { useLspStore, DiagnosticItem, EnhancedHoverData } from "@/lib/stores/lsp-store"
+import { useLspStore, DiagnosticItem, EnhancedHoverData, CompletionItem } from "@/lib/stores/lsp-store"
 import { invoke } from "@tauri-apps/api/core"
 import { EnhancedHoverTooltip } from "@/components/ui/hover-tooltip"
 import { createPortal } from "react-dom"
@@ -147,6 +147,71 @@ function getCursorPosition(view: EditorView) {
   };
 }
 
+// Debug panel to show LSP data
+function LspDebugPanel({ data }: { data: any }) {
+  if (!data) return null;
+  
+  return (
+    <div className="fixed bottom-4 right-4 z-50 w-96 max-h-96 overflow-auto bg-background border border-border rounded-md shadow-md p-4">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="text-sm font-semibold">LSP Debug</h3>
+        <button 
+          className="text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => {
+            const debugElement = document.querySelector('[data-lsp-debug="true"]');
+            if (debugElement) {
+              debugElement.remove();
+            }
+          }}
+        >
+          Close
+        </button>
+      </div>
+      <pre className="text-xs overflow-auto whitespace-pre-wrap text-muted-foreground">
+        {JSON.stringify(data, null, 2)}
+      </pre>
+    </div>
+  );
+}
+
+// Typescript interface for debug data
+interface LspDebugData {
+  completionRequests: Array<any>;
+  completionResponses: Array<any>;
+  lastRequest: any;
+  lastResponse: any;
+  error: any;
+}
+
+// Global debug state for LSP
+const lspDebugData: LspDebugData = {
+  completionRequests: [],
+  completionResponses: [],
+  lastRequest: null,
+  lastResponse: null,
+  error: null
+};
+
+// Helper to show debug data in UI
+function showLspDebugData() {
+  let debugElement = document.querySelector('[data-lsp-debug="true"]');
+  
+  if (!debugElement) {
+    debugElement = document.createElement('div');
+    debugElement.setAttribute('data-lsp-debug', 'true');
+    document.body.appendChild(debugElement);
+  }
+  
+  const root = createPortal(
+    <LspDebugPanel data={lspDebugData} />,
+    debugElement as HTMLElement
+  );
+  
+  // Using requestAnimationFrame to ensure the portal is rendered
+  requestAnimationFrame(() => {
+    // Force rendering
+  });
+}
 
 const lspCompletion = (context: CompletionContext) => {
   const { state, pos } = context;
@@ -155,41 +220,94 @@ const lspCompletion = (context: CompletionContext) => {
   const lineEnd = line.to;
   const cursorPos = pos - lineStart;
 
-  
+  // Get LSP store state and functions
   const { getCompletions, currentFilePath } = useLspStore.getState();
   const filePath = useLspStore.getState().currentFilePath;
   
+  // Debug: Log request information
+  const requestInfo = {
+    timestamp: new Date().toISOString(),
+    filePath: filePath,
+    lineNumber: line.number - 1,
+    character: cursorPos,
+    lineText: line.text,
+    cursorPosition: pos,
+  };
   
+  console.log('[LSP Debug] Completion Request:', requestInfo);
+  lspDebugData.lastRequest = requestInfo;
+  lspDebugData.completionRequests.push(requestInfo);
+  
+  // Show debug panel
+  showLspDebugData();
+  
+  // Check if we have a valid file path
   if (!filePath || filePath !== currentFilePath) {
+    lspDebugData.error = 'No valid file path or mismatch with current file';
+    showLspDebugData();
+    console.warn('[LSP Debug] No valid file path or mismatch with current file');
     return null;
   }
   
-  
+  // Position in LSP format
   const lspPosition = {
     line: line.number - 1,
     character: cursorPos
   };
   
-  
-  return getCompletions(filePath, lspPosition).then(completions => {
-    
-    const cmCompletions = completions.map(item => ({
-      label: item.label,
-      type: item.kind.toLowerCase(),
-      detail: item.detail,
-      info: item.documentation,
-      apply: item.label
-    }));
-    
-    
-    const match = context.matchBefore(/[\w\d_\-\.]*/)
-    const from = match ? lineStart + match.from : pos;
-    
-    return {
-      from,
-      options: cmCompletions
-    };
-  });
+  // Call LSP completions
+  return getCompletions(filePath, lspPosition)
+    .then(completions => {
+      // Debug: Log response
+      const responseInfo = {
+        timestamp: new Date().toISOString(),
+        completionsCount: completions.length,
+        completions: completions,
+      };
+      
+      console.log('[LSP Debug] Completion Response:', responseInfo);
+      lspDebugData.lastResponse = responseInfo;
+      lspDebugData.completionResponses.push(responseInfo);
+      lspDebugData.error = null;
+      
+      // Show updated debug data
+      showLspDebugData();
+      
+      // Convert LSP completions to CodeMirror format
+      const cmCompletions = completions.map(item => ({
+        label: item.label,
+        type: item.kind.toLowerCase(),
+        detail: item.detail,
+        info: item.documentation,
+        apply: item.label
+      }));
+      
+      // Find matching text before cursor
+      const match = context.matchBefore(/[\w\d_\-\.]*/)
+      const from = match ? lineStart + match.from : pos;
+      
+      return {
+        from,
+        options: cmCompletions,
+        span: /^[\w\d_\-\.]*$/
+      };
+    })
+    .catch(error => {
+      // Debug: Log error
+      const errorInfo = {
+        timestamp: new Date().toISOString(),
+        message: error.message || String(error),
+        error: error
+      };
+      
+      console.error('[LSP Debug] Completion Error:', errorInfo);
+      lspDebugData.error = errorInfo;
+      
+      // Show error in debug data
+      showLspDebugData();
+      
+      return null;
+    });
 };
 
 
@@ -538,6 +656,26 @@ export function CodeEditor({
     );
   };
 
+  // Add keybinding to toggle debug panel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Alt+D to toggle debug panel
+      if (e.altKey && e.key === 'd') {
+        const debugElement = document.querySelector('[data-lsp-debug="true"]');
+        if (debugElement) {
+          debugElement.remove();
+        } else {
+          showLspDebugData();
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   return (
     <div className={cn("relative h-full w-full rounded-md border", className)} data-editor-container>
       <ScrollArea className="h-full w-full">
@@ -548,6 +686,23 @@ export function CodeEditor({
         renderHoverTooltip(),
         document.body
       )}
+      
+      {/* LSP Status Indicator */}
+      <div className="absolute bottom-2 right-2 flex items-center gap-2 text-xs bg-background/80 px-2 py-1 rounded-md">
+        <div 
+          className={cn(
+            "w-2 h-2 rounded-full", 
+            isServerRunning ? "bg-green-500" : "bg-red-500"
+          )} 
+        />
+        <span className="text-muted-foreground">{isServerRunning ? "LSP" : "No LSP"}</span>
+        <button 
+          className="text-primary text-xs hover:underline"
+          onClick={() => showLspDebugData()}
+        >
+          Debug
+        </button>
+      </div>
     </div>
   )
 }

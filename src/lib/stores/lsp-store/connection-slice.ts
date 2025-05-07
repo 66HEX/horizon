@@ -120,6 +120,7 @@ export class LspWebSocketClientImpl implements LspWebSocketClient {
               
               if (response.method === 'textDocument/publishDiagnostics') {
                 console.log(`Processing diagnostics notification with ${response.params?.diagnostics?.length || 0} items`);
+                console.log('Diagnostics details:', JSON.stringify(response.params?.diagnostics, null, 2));
               }
               
               const handler = this.notificationHandlers.get(response.method);
@@ -160,6 +161,7 @@ export class LspWebSocketClientImpl implements LspWebSocketClient {
     
     return this.connectionPromise;
   }
+  
 
   /**
    * Initialize the language server for a specific language
@@ -399,6 +401,7 @@ export class LspWebSocketClientImpl implements LspWebSocketClient {
    * @returns Promise that resolves when notification is sent
    */
   notifyDocumentChanged(filePath: string, content: string, version: number): Promise<void> {
+    console.log(`Notifying LSP server about document change: ${filePath} (version ${version}, content length: ${content.length})`);
     return this.sendNotification("textDocument/didChange", {
       textDocument: {
         uri: `file://${filePath}`,
