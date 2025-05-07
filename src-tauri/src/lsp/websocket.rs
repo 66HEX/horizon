@@ -612,7 +612,7 @@ impl WebSocketManager {
                                 "textDocument/didChange" => {
                                     logger::info("WebSocketManager", "Received didChange notification");
                                     
-                                    let mut file_uri = "".to_string();
+                                    let mut _file_uri = "".to_string();
                                     let mut has_content = false;
                                     
                                     if let Some(params) = json_rpc.get("params") {
@@ -620,7 +620,7 @@ impl WebSocketManager {
                                             if let Some(uri) = text_doc.get("uri") {
                                                 if let Some(uri_str) = uri.as_str() {
                                                     logger::info("WebSocketManager", &format!("Document URI in didChange: {}", uri_str));
-                                                    file_uri = uri_str.to_string();
+                                                    _file_uri = uri_str.to_string();
                                                 }
                                             }
                                         }
@@ -858,7 +858,7 @@ impl WebSocketManager {
         }
     }
 
-    pub async fn register_client_for_diagnostics(&self, file_path: &str, server_id: &str, sender: mpsc::UnboundedSender<Message>) -> Result<()> {
+    pub async fn register_client_for_diagnostics(&self, file_path: &str, server_id: &str, _sender: mpsc::UnboundedSender<Message>) -> Result<()> {
         logger::info("WebSocketManager", &format!("Registering client for diagnostics for: {}", file_path));
         
         let diagnostics_handler = {
