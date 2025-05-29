@@ -255,10 +255,10 @@ const EditorContentArea = useMemo(() => {
 return (
     <ThemeProvider forceDarkMode={true}>
         <AppSidebar variant="inset"/>
-        <SidebarInset className="border rounded-xl select-none">
-            <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 bg-sidebar rounded-t-xl">
+        <SidebarInset className="rounded-xl select-none overflow-x-auto bg-sidebar-accent/20 border border-sidebar-border">
+            <header className="flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border px-4 relative">
                 <FileSelectionTabs />
-                <div className="ml-auto flex gap-2">
+                <div className="flex gap-2 absolute right-4 flex-shrink-0">
                     <Button
                         variant="ghost"
                         size="icon"
@@ -286,10 +286,12 @@ return (
                 </div>
             </header>
             
-            <div className="flex flex-1 flex-col rounded-b-xl">
+            <div className="flex flex-1 flex-col">
                 <ResizablePanelGroup direction="vertical">
                     <ResizablePanel defaultSize={isTerminalVisible ? 60 : 100}>
-                        {EditorContentArea}
+                        <div className="h-full w-full">
+                            {EditorContentArea}
+                        </div>
                     </ResizablePanel>
                     {isTerminalVisible && (
                         <>

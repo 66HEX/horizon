@@ -35,14 +35,15 @@ import { createPortal } from "react-dom"
 
 const shadcnTheme = EditorView.theme({
   "&": {
-    height: "100%",
+    minHeight: "100vh",
     fontSize: "14px",
     backgroundColor: "var(--background)",
     color: "var(--muted-foreground)"
   },
   ".cm-scroller": {
     overflow: "auto",
-    overscrollBehavior: "contain"
+    overscrollBehavior: "contain",
+    minHeight: "100vh"
   },
   ".cm-content": {
     caretColor: "var(--primary)"
@@ -67,6 +68,7 @@ const shadcnTheme = EditorView.theme({
     backgroundColor: "var(--muted)"
   },
   ".cm-gutters": {
+    minHeight: "100vh",
     backgroundColor: "var(--card)",
     color: "var(--muted-foreground)",
     border: "none",
@@ -152,7 +154,7 @@ function LspDebugPanel({ data }: { data: any }) {
   if (!data) return null;
   
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-96 max-h-96 overflow-auto bg-background border border-border rounded-md shadow-md p-4">
+    <div className="fixed bottom-4 right-4 z-50 w-96 max-h-96 overflow-auto rounded-md shadow-md p-4">
       <div className="flex justify-between items-center mb-2">
         <h3 className="text-sm font-semibold">LSP Debug</h3>
         <button 
@@ -310,7 +312,6 @@ const lspCompletion = (context: CompletionContext) => {
     });
 };
 
-
 const lspLinter = linter(view => {
   const { diagnostics, currentFilePath } = useLspStore.getState();
   const filePath = useLspStore.getState().currentFilePath;
@@ -351,7 +352,6 @@ export function CodeEditor({
     setHoverState(null);
   };
   
-  
   const { 
     startLspServer, 
     isWebSocketRunning, 
@@ -361,14 +361,11 @@ export function CodeEditor({
     closeDocument 
   } = useLspStore();
   
-  
   useEffect(() => {
     if (filePath && language && isWebSocketRunning) {
-      
-      
+
       const getProjectRoot = async (filePath: string, lang: string): Promise<string> => {
         try {
-          
           const rootPath = await invoke('find_project_root', { filePath, language: lang });
           console.log(`Found project root: ${rootPath} for file: ${filePath}, language: ${lang}`);
           return rootPath as string;
@@ -378,18 +375,14 @@ export function CodeEditor({
           return filePath.substring(0, filePath.lastIndexOf('/'));
         }
       };
-      
-      
+
       (async () => {
         try {
-          
           const rootPath = await getProjectRoot(filePath, language);
-          
           
           if (!isServerRunning) {
             await startLspServer(language, rootPath);
           }
-          
           
           if (initialValue !== undefined) {
             await openDocument(filePath, language, initialValue);
@@ -400,7 +393,6 @@ export function CodeEditor({
         }
       })();
     }
-    
     
     return () => {
       if (filePath && isServerRunning) {
@@ -417,32 +409,21 @@ export function CodeEditor({
       if (!viewRef.current) return;
       
       const { line, character } = event.detail;
-      
-      
       const doc = viewRef.current.state.doc;
-      
-      
-      
       const targetLine = Math.min(doc.lines, line + 1);
       const lineStart = doc.line(targetLine).from;
       const lineLength = doc.line(targetLine).length;
-      
-      
       const pos = lineStart + Math.min(character, lineLength);
-      
-      
+
       const transaction = viewRef.current.state.update({
         selection: { anchor: pos, head: pos },
         scrollIntoView: true
       });
       
-      
       viewRef.current.dispatch(transaction);
     };
     
-    
     window.addEventListener('navigate-to-position', handleNavigation as EventListener);
-    
     
     return () => {
       window.removeEventListener('navigate-to-position', handleNavigation as EventListener);
@@ -677,9 +658,9 @@ export function CodeEditor({
   }, []);
 
   return (
-    <div className={cn("relative h-full w-full rounded-md border", className)} data-editor-container>
-      <ScrollArea className="h-full w-full">
-        <div className="relative h-full min-h-[200px]" ref={editorRef} />
+    <div className={cn("relative h-full w-full", className)} data-editor-container>
+      <ScrollArea className="h-full w-full overscroll-none">
+        <div className="relative h-full overscroll-none" ref={editorRef} />
       </ScrollArea>
       
       {hoverState?.isVisible && createPortal(

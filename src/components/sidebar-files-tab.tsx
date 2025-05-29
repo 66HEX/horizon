@@ -39,24 +39,40 @@ export function SidebarFilesTab({
               : 'Files'}
           </SidebarGroupLabel>
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleOpenFile}
-              title="Open File"
-              className="h-6 w-6 hover:bg-sidebar-accent/20"
-            >
-              <IconFile className="size-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleOpenDirectory}
-              title="Open Directory"
-              className="h-6 w-6 hover:bg-sidebar-accent/20"
-            >
-              <IconFolderOpen className="size-3" />
-            </Button>
+          <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleOpenFile}
+                    className="h-6 w-6 hover:bg-sidebar-accent/20 disabled:hover:scale-100"
+                  >
+                    <IconFile className="size-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Open File
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleOpenDirectory}
+                    className="h-6 w-6 hover:bg-sidebar-accent/20 disabled:hover:scale-100"
+                  >
+                    <IconFolderOpen className="size-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Open Directory
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>

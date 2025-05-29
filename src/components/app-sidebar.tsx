@@ -129,7 +129,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         />
       )}
 
-      <SidebarContent className="relative w-full h-full bg-sidebar-background select-none">
+      <SidebarContent className="relative w-full h-full select-none">
         <div className="flex h-full">
           {/* Sidebar Navigation */}
           <SidebarTabs 
@@ -139,8 +139,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           />
 
           {/* Tab Content */}
-          <div className="flex-1 flex flex-col">
-            <div className="flex flex-col w-full bg-gradient-to-r from-sidebar-background to-sidebar-background/95 backdrop-blur-sm border-b border-sidebar-border/20">
+          <div className="flex-1 flex flex-col overflow-x-hidden">
+            <div className="flex flex-col w-full bg-gradient-to-r from-sidebar-background to-sidebar-background/95 backdrop-blur-sm">
               {activeTab === "files" && (
                 <SidebarFilesTab 
                   handleOpenFile={handleOpenFile}

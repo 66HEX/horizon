@@ -11,7 +11,7 @@ export function FileSelectionTabs() {
   }
 
   return (
-    <div className="flex h-10 items-center gap-1 px-2">
+    <div className="flex h-10 items-center gap-1 px-2 overflow-hidden">
       <Tabs value={activeFilePath || undefined} className="w-full">
         <TabsList className="h-8 w-fit flex gap-1 bg-transparent p-0">
           {openFiles.map((file) => {
