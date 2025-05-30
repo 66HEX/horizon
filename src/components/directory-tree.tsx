@@ -114,7 +114,7 @@ export function DirectoryTree({ item, onFileClick, activeFilePath }: {
         }}
       >
         <div
-          className={`flex flex-row items-center gap-2 py-1 px-2 rounded cursor-pointer hover:bg-muted ${isActive ? 'bg-muted' : ''}`}
+          className={`flex flex-row items-center gap-2 py-1 px-2 rounded cursor-pointer hover:bg-sidebar-accent ${isActive ? 'bg-muted' : ''}`}
           onClick={handleClick}
           onContextMenu={handleContextMenu}
         >

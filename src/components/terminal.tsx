@@ -502,7 +502,7 @@ const Terminal: React.FC<TerminalProps> = ({
   return (
     <div 
       className={cn(
-        "flex flex-col h-full text-sidebar-foreground bg-gradient-to-b from-sidebar-background to-sidebar-background/95 backdrop-blur-sm",
+        "flex flex-col h-full text-sidebar-foreground bg-background backdrop-blur-sm",
         className
       )}
       onKeyDown={handleKeyPress}

@@ -37,7 +37,7 @@ const shadcnTheme = EditorView.theme({
   "&": {
     minHeight: "100vh",
     fontSize: "14px",
-    backgroundColor: "var(--background)",
+    backgroundColor: "#1B1B1E",
     color: "var(--muted-foreground)"
   },
   ".cm-scroller": {

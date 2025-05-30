@@ -14,7 +14,7 @@ export interface SidebarTabsProps {
 
 export function SidebarTabs({ activeTab, setActiveTab, diagnosticSummary }: SidebarTabsProps) {
   return (
-    <div className="w-12 bg-sidebar-accent/50 flex flex-col items-center py-2 rounded-md">
+    <div className="w-12 bg-sidebar-accent/20 border-r border-sidebar-border flex flex-col items-center py-2">
       <button
         onClick={() => setActiveTab("files")}
         className={`p-2 rounded-md mb-2 cursor-pointer ${activeTab === "files" ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/50"}`}

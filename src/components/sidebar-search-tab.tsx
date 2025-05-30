@@ -121,7 +121,7 @@ export function SidebarSearchTab({
 
       <SidebarGroupContent className="relative overflow-hidden h-full">
         <div className="px-1 pb-2 pt-2">
-          <div className="relative ml-2">
+          <div className="relative mx-2">
             <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none">
               <IconSearch className="h-4 w-4 text-muted-foreground" />
             </div>

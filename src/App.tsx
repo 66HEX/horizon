@@ -11,7 +11,6 @@ import { FileInfo } from "@/lib/file-service"
 import { ImageViewer } from "@/components/image-viewer"
 import { convertFileSrc } from "@tauri-apps/api/core"
 import Terminal from "@/components/terminal"
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
 import { Button } from "@/components/ui/button"
 import { FileSelectionTabs } from "@/components/ui/file-selection-tabs"
 import { IconLayoutSidebar, IconLayoutBottombar, IconLayoutSidebarFilled, IconLayoutBottombarFilled } from "@tabler/icons-react"
@@ -105,6 +104,7 @@ function MainContent() {
     const prevFilePathRef = useRef<string | null>(null);
     
     const [isTerminalVisible, setIsTerminalVisible] = useState(false);
+    const [isTerminalAnimating, setIsTerminalAnimating] = useState(false);
     const [terminalInstances, setTerminalInstances] = useState<TerminalInstance[]>([]);
     const [activeTerminalId, setActiveTerminalId] = useState<string | null>(null);
     
@@ -143,6 +143,23 @@ function MainContent() {
             saveFile(contentToSave);
         }
     }, [saveFile, currentFile?.id, currentFile?.path, currentFile]);
+    
+    // Animowany toggle terminala
+    const toggleTerminal = useCallback(() => {
+        if (isTerminalAnimating) return;
+        
+        setIsTerminalAnimating(true);
+        
+        if (isTerminalVisible) {
+            // Ukrywanie terminala
+            setIsTerminalVisible(false);
+            setTimeout(() => setIsTerminalAnimating(false), 300);
+        } else {
+            // Pokazywanie terminala
+            setIsTerminalVisible(true);
+            setTimeout(() => setIsTerminalAnimating(false), 300);
+        }
+    }, [isTerminalVisible, isTerminalAnimating]);
     
     useEffect(() => {
         if (prevFilePathRef.current !== activeFilePath) {
@@ -255,8 +272,8 @@ const EditorContentArea = useMemo(() => {
 return (
     <ThemeProvider forceDarkMode={true}>
         <AppSidebar variant="inset"/>
-        <SidebarInset className="rounded-xl select-none overflow-x-auto bg-sidebar-accent/20 border border-sidebar-border">
-            <header className="flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border px-4 relative">
+        <SidebarInset className="rounded-xl select-none overflow-x-auto bg-[#1B1B1E] border border-sidebar-border">
+            <header className="flex h-12 shrink-0 items-center gap-2 bg-background border-b border-sidebar-border px-4 relative">
                 <FileSelectionTabs />
                 <div className="flex gap-2 absolute right-4 flex-shrink-0">
                     <Button
@@ -274,7 +291,8 @@ return (
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setIsTerminalVisible(!isTerminalVisible)}
+                        onClick={toggleTerminal}
+                        disabled={isTerminalAnimating}
                         title={isTerminalVisible ? "Hide Terminal" : "Show Terminal"}
                     >
                         {isTerminalVisible ? (
@@ -286,31 +304,38 @@ return (
                 </div>
             </header>
             
-            <div className="flex flex-1 flex-col">
-                <ResizablePanelGroup direction="vertical">
-                    <ResizablePanel defaultSize={isTerminalVisible ? 60 : 100}>
-                        <div className="h-full w-full">
-                            {EditorContentArea}
+            <div className="flex flex-1 flex-col overflow-hidden max-h-screen">
+                <div className="flex flex-col h-full">
+                    <div 
+                        className={`
+                            transition-all duration-300 ease-in-out 
+                            ${isTerminalVisible ? 'h-3/5' : 'h-full'}
+                        `}
+                    >
+                        {EditorContentArea}
+                    </div>
+                    
+                    <div 
+                        className={`
+                            transition-all duration-300 ease-in-out overflow-hidden
+                            ${isTerminalVisible 
+                                ? 'h-2/5 opacity-100 border-t border-sidebar-border' 
+                                : 'h-0 opacity-0'
+                            }
+                        `}
+                    >
+                        <div className="select-text w-full h-full">
+                            <Terminal
+                                onClose={() => setIsTerminalVisible(false)}
+                                isTerminalVisible={isTerminalVisible}
+                                instances={terminalInstances}
+                                setInstances={setTerminalInstances}
+                                activeInstanceId={activeTerminalId}
+                                setActiveInstanceId={setActiveTerminalId}
+                            />
                         </div>
-                    </ResizablePanel>
-                    {isTerminalVisible && (
-                        <>
-                            <ResizableHandle />
-                            <ResizablePanel defaultSize={40}>
-                                <div className="select-text w-full h-full">
-                                    <Terminal
-                                        onClose={() => setIsTerminalVisible(false)}
-                                        isTerminalVisible={isTerminalVisible}
-                                        instances={terminalInstances}
-                                        setInstances={setTerminalInstances}
-                                        activeInstanceId={activeTerminalId}
-                                        setActiveInstanceId={setActiveTerminalId}
-                                    />
-                                </div>
-                            </ResizablePanel>
-                        </>
-                    )}
-                </ResizablePanelGroup>
+                    </div>
+                </div>
             </div>
         </SidebarInset>
     </ThemeProvider>
@@ -324,4 +349,3 @@ export default function App() {
         </SidebarProvider>
     );
 }
-
