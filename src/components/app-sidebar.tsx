@@ -139,7 +139,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           />
 
           {/* Tab Content */}
-          <div className="flex-1 flex flex-col overflow-x-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden">
             <div className="flex flex-col w-full bg-gradient-to-r from-sidebar-background to-sidebar-background/95 backdrop-blur-sm">
               {activeTab === "files" && (
                 <SidebarFilesTab 

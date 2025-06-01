@@ -115,7 +115,7 @@ export function SidebarFilesTab({
 
       <SidebarGroupContent className="relative overflow-hidden h-full">
         <ScrollArea className="absolute inset-0 w-full h-full" type="auto" scrollHideDelay={400}>
-          <SidebarMenu>
+          <SidebarMenu className="max-h-[100vh]">
             {directoryStructure ? (
               directoryStructure.map((item, index) => (
                 <DirectoryTree
