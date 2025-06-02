@@ -1,6 +1,24 @@
-import * as React from "react"
-import { useState, useEffect, useRef } from "react"
-import { IconChevronRight, IconFile, IconFolderOpen, IconDeviceFloppy, IconDownload, IconSearch, IconX, IconGitBranch, IconFolder, IconFileText, IconFolderPlus, IconCopy, IconTrash, IconEdit, IconScissors, IconClipboard, IconAlertTriangle } from "@tabler/icons-react"
+import * as React from "react";
+import { useState, useEffect, useRef } from "react";
+import {
+  IconChevronRight,
+  IconFile,
+  IconFolderOpen,
+  IconDeviceFloppy,
+  IconDownload,
+  IconSearch,
+  IconX,
+  IconGitBranch,
+  IconFolder,
+  IconFileText,
+  IconFolderPlus,
+  IconCopy,
+  IconTrash,
+  IconEdit,
+  IconScissors,
+  IconClipboard,
+  IconAlertTriangle,
+} from "@tabler/icons-react";
 import {
   Sidebar,
   SidebarContent,
@@ -9,25 +27,30 @@ import {
   SidebarMenu,
   SidebarRail,
   useSidebar,
-} from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { DirectoryItem } from "@/lib/file-service"
-import { useFileContext } from "@/lib/file-context"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { ScrollArea } from "./ui/scroll-area"
+} from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { DirectoryItem } from "@/lib/file-service";
+import { useFileContext } from "@/lib/file-context";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { ScrollArea } from "./ui/scroll-area";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuGroup,
-} from "@/components/ui/dropdown-menu"
-import { RenameDialog } from "./rename-dialog"
-import { CreateDialog } from "./create-dialog"
-import { FileService } from "@/lib/file-service"
-import { useLspStore } from "@/lib/lsp-store"
-import { Badge } from "@/components/ui/badge"
+} from "@/components/ui/dropdown-menu";
+import { RenameDialog } from "./rename-dialog";
+import { CreateDialog } from "./create-dialog";
+import { FileService } from "@/lib/file-service";
+import { useLspStore } from "@/lib/lsp-store";
+import { Badge } from "@/components/ui/badge";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { toggleSidebar } = useSidebar();
@@ -48,12 +71,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     closeRenameDialog,
     createDialog,
     handleCreateSubmit,
-    closeCreateDialog
+    closeCreateDialog,
   } = useFileContext();
-  
-  
+
   const { diagnostics, currentFilePath } = useLspStore();
-  
+
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [searchResults, setSearchResults] = useState<DirectoryItem[]>([]);
   const [isSearchMode, setIsSearchMode] = useState<boolean>(false);
@@ -62,17 +84,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const searchingIndicatorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [activeTab, setActiveTab] = useState<string>("files");
 
-  
   const diagnosticSummary = React.useMemo(() => {
-    const errorCount = diagnostics.filter(d => d.severity === 'error').length;
-    const warningCount = diagnostics.filter(d => d.severity === 'warning').length;
-    const infoCount = diagnostics.filter(d => d.severity === 'information' || d.severity === 'hint').length;
-    
+    const errorCount = diagnostics.filter((d) => d.severity === "error").length;
+    const warningCount = diagnostics.filter(
+      (d) => d.severity === "warning",
+    ).length;
+    const infoCount = diagnostics.filter(
+      (d) => d.severity === "information" || d.severity === "hint",
+    ).length;
+
     return {
       errorCount,
       warningCount,
       infoCount,
-      total: errorCount + warningCount + infoCount
+      total: errorCount + warningCount + infoCount,
     };
   }, [diagnostics]);
 
@@ -81,9 +106,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       toggleSidebar();
     };
 
-    document.addEventListener('toggle-sidebar', handleToggleSidebar);
+    document.addEventListener("toggle-sidebar", handleToggleSidebar);
     return () => {
-      document.removeEventListener('toggle-sidebar', handleToggleSidebar);
+      document.removeEventListener("toggle-sidebar", handleToggleSidebar);
     };
   }, [toggleSidebar]);
 
@@ -131,18 +156,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       const combinedResults = [...fileNameResults];
 
-      contentResults.forEach(contentItem => {
-        if (!combinedResults.some(item => item.path === contentItem.path)) {
+      contentResults.forEach((contentItem) => {
+        if (!combinedResults.some((item) => item.path === contentItem.path)) {
           combinedResults.push({
             ...contentItem,
-            name: `${contentItem.name} (match in content)`
+            name: `${contentItem.name} (match in content)`,
           });
         }
       });
 
       setSearchResults(combinedResults);
     } catch (error) {
-      console.error('Error during search:', error);
+      console.error("Error during search:", error);
     } finally {
       if (searchingIndicatorTimeoutRef.current) {
         clearTimeout(searchingIndicatorTimeoutRef.current);
@@ -198,8 +223,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const handleFileClick = async (filePath: string) => {
     try {
       await openFileFromPath(filePath);
-    } catch (error) {
-    }
+    } catch (error) {}
   };
 
   return (
@@ -210,7 +234,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           onClose={closeRenameDialog}
           onRename={handleRenameSubmit}
           itemName={renameDialog.name}
-          itemType={renameDialog.isDirectory ? 'folder' : 'file'}
+          itemType={renameDialog.isDirectory ? "folder" : "file"}
         />
       )}
 
@@ -220,13 +244,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           onClose={closeCreateDialog}
           onCreate={handleCreateSubmit}
           itemType={createDialog.type}
-          directoryPath={createDialog.path || ''}
+          directoryPath={createDialog.path || ""}
         />
       )}
 
       <SidebarContent className="relative w-full h-full bg-sidebar-background select-none">
         <div className="flex h-full">
-          <div className="w-12 bg-sidebar-accent/5 border-r border-sidebar-border/20 flex flex-col items-center py-2">
+          <div className="w-12 bg-sidebar-accent/5 border-r border-sidebar-border/20 flex flex-col items-center py-2 pt-6 pl-6.5 pr-8">
             <button
               onClick={() => setActiveTab("files")}
               className={`p-2 rounded-md mb-2 cursor-pointer ${activeTab === "files" ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/50"}`}
@@ -245,9 +269,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             >
               <IconAlertTriangle className="h-4 w-4" />
               {diagnosticSummary.total > 0 && (
-                <Badge 
-                  className="absolute -top-1 -right-1 p-1 h-4 min-w-4 flex items-center justify-center text-xs" 
-                  variant={diagnosticSummary.errorCount > 0 ? "destructive" : diagnosticSummary.warningCount > 0 ? "warning" : "default"}
+                <Badge
+                  className="absolute -top-1 -right-1 p-1 h-4 min-w-4 flex items-center justify-center text-xs"
+                  variant={
+                    diagnosticSummary.errorCount > 0
+                      ? "destructive"
+                      : diagnosticSummary.warningCount > 0
+                        ? "warning"
+                        : "default"
+                  }
                 >
                   {diagnosticSummary.total}
                 </Badge>
@@ -268,13 +298,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <SidebarGroupLabel className="mb-0">
                     {activeTab === "search"
                       ? `Search`
-                      : (activeTab === "git"
-                          ? `Git Integration`
-                          : (activeTab === "diagnostics"
-                              ? `Diagnostics ${diagnosticSummary.total > 0 ? `(${diagnosticSummary.total})` : ''}`
-                              : (isSearchMode 
-                                  ? `Results (${searchResults.length})` 
-                                  : (currentDirectory ? `Files (${currentDirectory.split('/').pop() || currentDirectory.split('\\').pop()})` : 'Files'))))}
+                      : activeTab === "git"
+                        ? `Git Integration`
+                        : activeTab === "diagnostics"
+                          ? `Diagnostics ${diagnosticSummary.total > 0 ? `(${diagnosticSummary.total})` : ""}`
+                          : isSearchMode
+                            ? `Results (${searchResults.length})`
+                            : currentDirectory
+                              ? `Files (${currentDirectory.split("/").pop() || currentDirectory.split("\\").pop()})`
+                              : "Files"}
                   </SidebarGroupLabel>
                   <div className="flex items-center gap-1">
                     {activeTab === "files" && (
@@ -335,22 +367,27 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         </TooltipProvider>
                       </>
                     )}
-                    {activeTab === "diagnostics" && diagnosticSummary.total > 0 && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        {diagnosticSummary.errorCount > 0 && (
-                          <div className="flex items-center">
-                            <span className="text-destructive mr-1">{diagnosticSummary.errorCount}</span>
-                            <span>Errors</span>
-                          </div>
-                        )}
-                        {diagnosticSummary.warningCount > 0 && (
-                          <div className="flex items-center ml-2">
-                            <span className="text-warning mr-1">{diagnosticSummary.warningCount}</span>
-                            <span>Warnings</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {activeTab === "diagnostics" &&
+                      diagnosticSummary.total > 0 && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          {diagnosticSummary.errorCount > 0 && (
+                            <div className="flex items-center">
+                              <span className="text-destructive mr-1">
+                                {diagnosticSummary.errorCount}
+                              </span>
+                              <span>Errors</span>
+                            </div>
+                          )}
+                          {diagnosticSummary.warningCount > 0 && (
+                            <div className="flex items-center ml-2">
+                              <span className="text-warning mr-1">
+                                {diagnosticSummary.warningCount}
+                              </span>
+                              <span>Warnings</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                   </div>
                 </div>
               </div>
@@ -359,7 +396,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <div className="flex-1 overflow-hidden">
               {activeTab === "files" && (
                 <SidebarGroupContent className="relative overflow-hidden h-full">
-                  <ScrollArea className="absolute inset-0 w-full h-full" type="auto" scrollHideDelay={400}>
+                  <ScrollArea
+                    className="absolute inset-0 w-full h-full"
+                    type="auto"
+                    scrollHideDelay={400}
+                  >
                     <SidebarMenu>
                       {directoryStructure ? (
                         directoryStructure.map((item, index) => (
@@ -372,7 +413,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         ))
                       ) : (
                         <div className="flex flex-col items-center justify-center h-full px-2 text-center text-muted-foreground">
-                          <p className="text-xs mt-2">Open a directory to view files</p>
+                          <p className="text-xs mt-2">
+                            Open a directory to view files
+                          </p>
                         </div>
                       )}
                     </SidebarMenu>
@@ -405,7 +448,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       )}
                     </div>
                   </div>
-                  <ScrollArea className="absolute inset-0 w-full h-full" type="auto" scrollHideDelay={400}>
+                  <ScrollArea
+                    className="absolute inset-0 w-full h-full"
+                    type="auto"
+                    scrollHideDelay={400}
+                  >
                     <SidebarMenu>
                       {isSearching ? (
                         <div className="px-2 py-4 text-center text-muted-foreground">
@@ -422,11 +469,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         ))
                       ) : searchQuery ? (
                         <div className="px-2 py-4 text-center text-muted-foreground">
-                          <p className="text-sm">No results for "{searchQuery}"</p>
+                          <p className="text-sm">
+                            No results for "{searchQuery}"
+                          </p>
                         </div>
                       ) : (
                         <div className="flex flex-col items-center justify-center h-full px-2 text-center text-muted-foreground">
-                          <p className="text-xs mt-2">Enter a search term to find files and content</p>
+                          <p className="text-xs mt-2">
+                            Enter a search term to find files and content
+                          </p>
                         </div>
                       )}
                     </SidebarMenu>
@@ -436,31 +487,38 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
               {activeTab === "diagnostics" && (
                 <SidebarGroupContent className="relative overflow-hidden h-full">
-                  <ScrollArea className="absolute inset-0 w-full h-full" type="auto" scrollHideDelay={400}>
+                  <ScrollArea
+                    className="absolute inset-0 w-full h-full"
+                    type="auto"
+                    scrollHideDelay={400}
+                  >
                     <SidebarMenu>
                       {!currentFilePath ? (
                         <div className="flex flex-col items-center justify-center h-full px-2 text-center text-muted-foreground">
-                          <p className="text-xs mt-2">Open a file to view diagnostics</p>
+                          <p className="text-xs mt-2">
+                            Open a file to view diagnostics
+                          </p>
                         </div>
                       ) : diagnostics.length > 0 ? (
                         <div className="p-1">
                           {diagnostics.map((diagnostic, index) => (
-                            <div 
-                              key={`diagnostic-${index}`} 
+                            <div
+                              key={`diagnostic-${index}`}
                               className="p-2 mb-1 text-xs rounded-md hover:bg-sidebar-accent/10 cursor-pointer border-l-2 border-l-transparent hover:border-l-sidebar-accent transition-colors"
                               style={{
-                                borderLeftColor: diagnostic.severity === 'error' 
-                                  ? 'var(--destructive)' 
-                                  : diagnostic.severity === 'warning' 
-                                    ? 'var(--warning)' 
-                                    : 'var(--muted)'
+                                borderLeftColor:
+                                  diagnostic.severity === "error"
+                                    ? "var(--destructive)"
+                                    : diagnostic.severity === "warning"
+                                      ? "var(--warning)"
+                                      : "var(--muted)",
                               }}
                             >
                               <div className="flex items-start gap-2">
                                 <div className="flex-shrink-0 mt-0.5">
-                                  {diagnostic.severity === 'error' ? (
+                                  {diagnostic.severity === "error" ? (
                                     <IconAlertTriangle className="h-3.5 w-3.5 text-destructive" />
-                                  ) : diagnostic.severity === 'warning' ? (
+                                  ) : diagnostic.severity === "warning" ? (
                                     <IconAlertTriangle className="h-3.5 w-3.5 text-warning" />
                                   ) : (
                                     <IconAlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />
@@ -471,7 +529,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                     {diagnostic.message}
                                   </div>
                                   <div className="text-muted-foreground">
-                                    Line {diagnostic.range.start.line + 1}, Column {diagnostic.range.start.character + 1}
+                                    Line {diagnostic.range.start.line + 1},
+                                    Column{" "}
+                                    {diagnostic.range.start.character + 1}
                                   </div>
                                 </div>
                               </div>
@@ -482,7 +542,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         <div className="flex flex-col items-center justify-center h-full px-2 text-center text-muted-foreground">
                           <IconAlertTriangle className="h-10 w-10 mb-2 text-muted-foreground opacity-20" />
                           <p className="text-sm">No diagnostics found</p>
-                          <p className="text-xs mt-1">The current file has no errors or warnings</p>
+                          <p className="text-xs mt-1">
+                            The current file has no errors or warnings
+                          </p>
                         </div>
                       )}
                     </SidebarMenu>
@@ -492,10 +554,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
               {activeTab === "git" && (
                 <SidebarGroupContent className="relative overflow-hidden h-full">
-                  <ScrollArea className="absolute inset-0 w-full h-full" type="auto" scrollHideDelay={400}>
+                  <ScrollArea
+                    className="absolute inset-0 w-full h-full"
+                    type="auto"
+                    scrollHideDelay={400}
+                  >
                     <div className="mt-2 flex flex-col items-center justify-center h-full px-2 text-center text-muted-foreground">
                       <p className="mb-2">Git integration coming soon</p>
-                      <p className="text-xs">This feature will allow you to manage your git repository</p>
+                      <p className="text-xs">
+                        This feature will allow you to manage your git
+                        repository
+                      </p>
                     </div>
                   </ScrollArea>
                 </SidebarGroupContent>
@@ -506,20 +575,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarRail />
     </Sidebar>
-  )
+  );
 }
 
-function DirectoryTree({ item, onFileClick, activeFilePath }: {
-  item: DirectoryItem,
-  onFileClick: (path: string) => void,
-  activeFilePath: string | null
+function DirectoryTree({
+  item,
+  onFileClick,
+  activeFilePath,
+}: {
+  item: DirectoryItem;
+  onFileClick: (path: string) => void;
+  activeFilePath: string | null;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number, y: number } | null>(null);
-  const [localChildren, setLocalChildren] = useState<DirectoryItem[] | null>(null);
+  const [contextMenuPosition, setContextMenuPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [localChildren, setLocalChildren] = useState<DirectoryItem[] | null>(
+    null,
+  );
   const [isLocalLoading, setIsLocalLoading] = useState(false);
-  
-  const { 
+
+  const {
     loadDirectoryContents,
     handleCut,
     handleCopy,
@@ -530,42 +608,42 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
     handleDelete,
     handleCreateFile,
     handleCreateFolder,
-    clipboard
+    clipboard,
   } = useFileContext();
 
-  const hasClipboardContent = clipboard.path !== null && clipboard.type !== null;
+  const hasClipboardContent =
+    clipboard.path !== null && clipboard.type !== null;
 
-  
   useEffect(() => {
-    if (item.isDirectory && isExpanded && (item.needsLoading || !item.children || item.children.length === 0)) {
-      
+    if (
+      item.isDirectory &&
+      isExpanded &&
+      (item.needsLoading || !item.children || item.children.length === 0)
+    ) {
       setIsLocalLoading(true);
       setLocalChildren(null);
-      
-      
+
       const loadContents = async () => {
         try {
           loadDirectoryContents(item.path, item);
-          
-          
+
           const fileService = new FileService();
           const contents = await fileService.loadDirectoryContents(item.path);
           if (contents && contents.length > 0) {
             setLocalChildren(contents);
           } else {
-            
             setLocalChildren([]);
           }
-          
+
           setIsLocalLoading(false);
         } catch (error) {
-          console.error('Error loading contents:', error);
+          console.error("Error loading contents:", error);
           setIsLocalLoading(false);
-          
+
           setLocalChildren([]);
         }
       };
-      
+
       loadContents();
     }
   }, [isExpanded, item, loadDirectoryContents]);
@@ -590,19 +668,18 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
       if (item.isDirectory) {
         handlePaste(item.path);
       } else {
-        const { dirname } = await import('@tauri-apps/api/path');
+        const { dirname } = await import("@tauri-apps/api/path");
         const parentDir = await dirname(item.path);
         handlePaste(parentDir);
       }
     } catch (error) {
-      console.error('Error during paste operation:', error);
+      console.error("Error during paste operation:", error);
     }
     setContextMenuPosition(null);
   };
-  
-  
+
   const isLoading = localChildren === null ? isLocalLoading : false;
-    
+
   return (
     <div className="pl-1 max-w-[16rem]">
       <DropdownMenu
@@ -612,13 +689,13 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
         }}
       >
         <div
-          className={`flex flex-row items-center gap-2 py-1 px-2 rounded cursor-pointer hover:bg-muted ${isActive ? 'bg-muted' : ''}`}
+          className={`flex flex-row items-center gap-2 py-1 px-2 rounded cursor-pointer hover:bg-muted ${isActive ? "bg-muted" : ""}`}
           onClick={handleClick}
           onContextMenu={handleContextMenu}
         >
           {item.isDirectory ? (
             <IconChevronRight
-              className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+              className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-90" : ""}`}
             />
           ) : (
             <IconFile className="h-4 w-4 text-muted-foreground" />
@@ -630,25 +707,29 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
           <DropdownMenuContent
             className="w-56"
             style={{
-              position: 'absolute',
+              position: "absolute",
               left: `${contextMenuPosition.x}px`,
-              top: `${contextMenuPosition.y}px`
+              top: `${contextMenuPosition.y}px`,
             }}
           >
             {item.isDirectory && (
               <>
                 <DropdownMenuGroup>
-                  <DropdownMenuItem onSelect={() => {
-                    handleCreateFile(item.path);
-                    setContextMenuPosition(null);
-                  }}>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      handleCreateFile(item.path);
+                      setContextMenuPosition(null);
+                    }}
+                  >
                     <IconFileText className="mr-2 h-4 w-4" />
                     <span>New File</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => {
-                    handleCreateFolder(item.path);
-                    setContextMenuPosition(null);
-                  }}>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      handleCreateFolder(item.path);
+                      setContextMenuPosition(null);
+                    }}
+                  >
                     <IconFolderPlus className="mr-2 h-4 w-4" />
                     <span>New Folder</span>
                   </DropdownMenuItem>
@@ -658,17 +739,21 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
             )}
 
             <DropdownMenuGroup>
-              <DropdownMenuItem onSelect={() => {
-                handleCut(item.path);
-                setContextMenuPosition(null);
-              }}>
+              <DropdownMenuItem
+                onSelect={() => {
+                  handleCut(item.path);
+                  setContextMenuPosition(null);
+                }}
+              >
                 <IconScissors className="mr-2 h-4 w-4" />
                 <span>Cut</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => {
-                handleCopy(item.path);
-                setContextMenuPosition(null);
-              }}>
+              <DropdownMenuItem
+                onSelect={() => {
+                  handleCopy(item.path);
+                  setContextMenuPosition(null);
+                }}
+              >
                 <IconCopy className="mr-2 h-4 w-4" />
                 <span>Copy</span>
               </DropdownMenuItem>
@@ -683,17 +768,21 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
             <DropdownMenuSeparator />
 
             <DropdownMenuGroup>
-              <DropdownMenuItem onSelect={() => {
-                handleCopyPath(item.path);
-                setContextMenuPosition(null);
-              }}>
+              <DropdownMenuItem
+                onSelect={() => {
+                  handleCopyPath(item.path);
+                  setContextMenuPosition(null);
+                }}
+              >
                 <IconCopy className="mr-2 h-4 w-4" />
                 <span>Copy Path</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => {
-                handleCopyRelativePath(item.path);
-                setContextMenuPosition(null);
-              }}>
+              <DropdownMenuItem
+                onSelect={() => {
+                  handleCopyRelativePath(item.path);
+                  setContextMenuPosition(null);
+                }}
+              >
                 <IconCopy className="mr-2 h-4 w-4" />
                 <span>Copy Relative Path</span>
               </DropdownMenuItem>
@@ -702,10 +791,12 @@ function DirectoryTree({ item, onFileClick, activeFilePath }: {
             <DropdownMenuSeparator />
 
             <DropdownMenuGroup>
-              <DropdownMenuItem onSelect={() => {
-                handleRename(item.path);
-                setContextMenuPosition(null);
-              }}>
+              <DropdownMenuItem
+                onSelect={() => {
+                  handleRename(item.path);
+                  setContextMenuPosition(null);
+                }}
+              >
                 <IconEdit className="mr-2 h-4 w-4" />
                 <span>Rename</span>
               </DropdownMenuItem>
