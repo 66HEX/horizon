@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { EditorState, StateEffect } from "@codemirror/state"
 import { javascript } from "@codemirror/lang-javascript"
 import { cn } from "@/lib/utils"
-import { autocompletion, completionKeymap, CompletionContext, CompletionResult } from "@codemirror/autocomplete"
+import { autocompletion, completionKeymap, CompletionContext } from "@codemirror/autocomplete"
 import { html } from "@codemirror/lang-html"
 import { css } from "@codemirror/lang-css"
 import { python } from "@codemirror/lang-python"
@@ -23,26 +23,27 @@ import { EditorView, keymap, hoverTooltip } from "@codemirror/view"
 import { searchKeymap } from "@codemirror/search"
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language"
 import { tags as t } from "@lezer/highlight"
-import { ScrollArea } from "./ui/scroll-area"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands"
 import { lineNumbers, highlightActiveLineGutter } from "@codemirror/view"
 import { bracketMatching, foldGutter } from "@codemirror/language"
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete"
-import { useLspStore, CompletionItem as LspCompletionItem, DiagnosticItem, EnhancedHoverData } from "@/lib/lsp-store"
+import { useLspStore, DiagnosticItem, EnhancedHoverData, CompletionItem } from "@/lib/stores/lsp-store"
 import { invoke } from "@tauri-apps/api/core"
-import { EnhancedHoverTooltip } from "./ui/hover-tooltip"
+import { EnhancedHoverTooltip } from "@/components/ui/hover-tooltip"
 import { createPortal } from "react-dom"
 
 const shadcnTheme = EditorView.theme({
   "&": {
-    height: "100%",
+    minHeight: "100vh",
     fontSize: "14px",
-    backgroundColor: "var(--background)",
+    backgroundColor: "#1B1B1E",
     color: "var(--muted-foreground)"
   },
   ".cm-scroller": {
     overflow: "auto",
-    overscrollBehavior: "contain"
+    overscrollBehavior: "contain",
+    minHeight: "100vh"
   },
   ".cm-content": {
     caretColor: "var(--primary)"
@@ -67,6 +68,7 @@ const shadcnTheme = EditorView.theme({
     backgroundColor: "var(--muted)"
   },
   ".cm-gutters": {
+    minHeight: "100vh",
     backgroundColor: "var(--card)",
     color: "var(--muted-foreground)",
     border: "none",
@@ -147,6 +149,71 @@ function getCursorPosition(view: EditorView) {
   };
 }
 
+// Debug panel to show LSP data
+function LspDebugPanel({ data }: { data: any }) {
+  if (!data) return null;
+  
+  return (
+    <div className="fixed bottom-4 right-4 z-50 w-96 max-h-96 overflow-auto rounded-md shadow-md p-4">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="text-sm font-semibold">LSP Debug</h3>
+        <button 
+          className="text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => {
+            const debugElement = document.querySelector('[data-lsp-debug="true"]');
+            if (debugElement) {
+              debugElement.remove();
+            }
+          }}
+        >
+          Close
+        </button>
+      </div>
+      <pre className="text-xs overflow-auto whitespace-pre-wrap text-muted-foreground">
+        {JSON.stringify(data, null, 2)}
+      </pre>
+    </div>
+  );
+}
+
+// Typescript interface for debug data
+interface LspDebugData {
+  completionRequests: Array<any>;
+  completionResponses: Array<any>;
+  lastRequest: any;
+  lastResponse: any;
+  error: any;
+}
+
+// Global debug state for LSP
+const lspDebugData: LspDebugData = {
+  completionRequests: [],
+  completionResponses: [],
+  lastRequest: null,
+  lastResponse: null,
+  error: null
+};
+
+// Helper to show debug data in UI
+function showLspDebugData() {
+  let debugElement = document.querySelector('[data-lsp-debug="true"]');
+  
+  if (!debugElement) {
+    debugElement = document.createElement('div');
+    debugElement.setAttribute('data-lsp-debug', 'true');
+    document.body.appendChild(debugElement);
+  }
+  
+  const root = createPortal(
+    <LspDebugPanel data={lspDebugData} />,
+    debugElement as HTMLElement
+  );
+  
+  // Using requestAnimationFrame to ensure the portal is rendered
+  requestAnimationFrame(() => {
+    // Force rendering
+  });
+}
 
 const lspCompletion = (context: CompletionContext) => {
   const { state, pos } = context;
@@ -155,43 +222,95 @@ const lspCompletion = (context: CompletionContext) => {
   const lineEnd = line.to;
   const cursorPos = pos - lineStart;
 
-  
+  // Get LSP store state and functions
   const { getCompletions, currentFilePath } = useLspStore.getState();
   const filePath = useLspStore.getState().currentFilePath;
   
+  // Debug: Log request information
+  const requestInfo = {
+    timestamp: new Date().toISOString(),
+    filePath: filePath,
+    lineNumber: line.number - 1,
+    character: cursorPos,
+    lineText: line.text,
+    cursorPosition: pos,
+  };
   
+  console.log('[LSP Debug] Completion Request:', requestInfo);
+  lspDebugData.lastRequest = requestInfo;
+  lspDebugData.completionRequests.push(requestInfo);
+  
+  // Show debug panel
+  showLspDebugData();
+  
+  // Check if we have a valid file path
   if (!filePath || filePath !== currentFilePath) {
+    lspDebugData.error = 'No valid file path or mismatch with current file';
+    showLspDebugData();
+    console.warn('[LSP Debug] No valid file path or mismatch with current file');
     return null;
   }
   
-  
+  // Position in LSP format
   const lspPosition = {
     line: line.number - 1,
     character: cursorPos
   };
   
-  
-  return getCompletions(filePath, lspPosition).then(completions => {
-    
-    const cmCompletions = completions.map(item => ({
-      label: item.label,
-      type: item.kind.toLowerCase(),
-      detail: item.detail,
-      info: item.documentation,
-      apply: item.label
-    }));
-    
-    
-    const match = context.matchBefore(/[\w\d_\-\.]*/)
-    const from = match ? lineStart + match.from : pos;
-    
-    return {
-      from,
-      options: cmCompletions
-    };
-  });
+  // Call LSP completions
+  return getCompletions(filePath, lspPosition)
+    .then(completions => {
+      // Debug: Log response
+      const responseInfo = {
+        timestamp: new Date().toISOString(),
+        completionsCount: completions.length,
+        completions: completions,
+      };
+      
+      console.log('[LSP Debug] Completion Response:', responseInfo);
+      lspDebugData.lastResponse = responseInfo;
+      lspDebugData.completionResponses.push(responseInfo);
+      lspDebugData.error = null;
+      
+      // Show updated debug data
+      showLspDebugData();
+      
+      // Convert LSP completions to CodeMirror format
+      const cmCompletions = completions.map(item => ({
+        label: item.label,
+        type: item.kind.toLowerCase(),
+        detail: item.detail,
+        info: item.documentation,
+        apply: item.label
+      }));
+      
+      // Find matching text before cursor
+      const match = context.matchBefore(/[\w\d_\-\.]*/)
+      const from = match ? lineStart + match.from : pos;
+      
+      return {
+        from,
+        options: cmCompletions,
+        span: /^[\w\d_\-\.]*$/
+      };
+    })
+    .catch(error => {
+      // Debug: Log error
+      const errorInfo = {
+        timestamp: new Date().toISOString(),
+        message: error.message || String(error),
+        error: error
+      };
+      
+      console.error('[LSP Debug] Completion Error:', errorInfo);
+      lspDebugData.error = errorInfo;
+      
+      // Show error in debug data
+      showLspDebugData();
+      
+      return null;
+    });
 };
-
 
 const lspLinter = linter(view => {
   const { diagnostics, currentFilePath } = useLspStore.getState();
@@ -233,7 +352,6 @@ export function CodeEditor({
     setHoverState(null);
   };
   
-  
   const { 
     startLspServer, 
     isWebSocketRunning, 
@@ -243,14 +361,11 @@ export function CodeEditor({
     closeDocument 
   } = useLspStore();
   
-  
   useEffect(() => {
     if (filePath && language && isWebSocketRunning) {
-      
-      
+
       const getProjectRoot = async (filePath: string, lang: string): Promise<string> => {
         try {
-          
           const rootPath = await invoke('find_project_root', { filePath, language: lang });
           console.log(`Found project root: ${rootPath} for file: ${filePath}, language: ${lang}`);
           return rootPath as string;
@@ -260,18 +375,14 @@ export function CodeEditor({
           return filePath.substring(0, filePath.lastIndexOf('/'));
         }
       };
-      
-      
+
       (async () => {
         try {
-          
           const rootPath = await getProjectRoot(filePath, language);
-          
           
           if (!isServerRunning) {
             await startLspServer(language, rootPath);
           }
-          
           
           if (initialValue !== undefined) {
             await openDocument(filePath, language, initialValue);
@@ -282,7 +393,6 @@ export function CodeEditor({
         }
       })();
     }
-    
     
     return () => {
       if (filePath && isServerRunning) {
@@ -299,32 +409,21 @@ export function CodeEditor({
       if (!viewRef.current) return;
       
       const { line, character } = event.detail;
-      
-      
       const doc = viewRef.current.state.doc;
-      
-      
-      
       const targetLine = Math.min(doc.lines, line + 1);
       const lineStart = doc.line(targetLine).from;
       const lineLength = doc.line(targetLine).length;
-      
-      
       const pos = lineStart + Math.min(character, lineLength);
-      
-      
+
       const transaction = viewRef.current.state.update({
         selection: { anchor: pos, head: pos },
         scrollIntoView: true
       });
       
-      
       viewRef.current.dispatch(transaction);
     };
     
-    
     window.addEventListener('navigate-to-position', handleNavigation as EventListener);
-    
     
     return () => {
       window.removeEventListener('navigate-to-position', handleNavigation as EventListener);
@@ -526,7 +625,6 @@ export function CodeEditor({
     }
   }
 
-  // Render EnhancedHoverTooltip only
   const renderHoverTooltip = () => {
     if (!hoverState?.isVisible) return null;
     
@@ -539,16 +637,53 @@ export function CodeEditor({
     );
   };
 
+  // Add keybinding to toggle debug panel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Alt+D to toggle debug panel
+      if (e.altKey && e.key === 'd') {
+        const debugElement = document.querySelector('[data-lsp-debug="true"]');
+        if (debugElement) {
+          debugElement.remove();
+        } else {
+          showLspDebugData();
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   return (
-    <div className={cn("relative h-full w-full rounded-md border", className)} data-editor-container>
-      <ScrollArea className="h-full w-full">
-        <div className="relative h-full min-h-[200px]" ref={editorRef} />
+    <div className={cn("relative h-full w-full", className)} data-editor-container>
+      <ScrollArea className="h-full w-full overscroll-none">
+        <div className="relative h-full overscroll-none" ref={editorRef} />
       </ScrollArea>
       
       {hoverState?.isVisible && createPortal(
         renderHoverTooltip(),
         document.body
       )}
+      
+      {/* LSP Status Indicator */}
+      <div className="absolute bottom-2 right-2 flex items-center gap-2 text-xs bg-background/80 px-2 py-1 rounded-md">
+        <div 
+          className={cn(
+            "w-2 h-2 rounded-full", 
+            isServerRunning ? "bg-green-500" : "bg-red-500"
+          )} 
+        />
+        <span className="text-muted-foreground">{isServerRunning ? "LSP" : "No LSP"}</span>
+        <button 
+          className="text-primary text-xs hover:underline"
+          onClick={() => showLspDebugData()}
+        >
+          Debug
+        </button>
+      </div>
     </div>
   )
 }

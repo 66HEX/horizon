@@ -367,9 +367,15 @@ impl LanguageServer for RustLanguageServer {
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let uri = params.text_document.uri.to_string();
         
+        println!("Received didChange for document: {}", uri);
+        
         if !params.content_changes.is_empty() {
             let last_change = &params.content_changes[params.content_changes.len() - 1];
             let new_text = last_change.text.clone();
+            let text_length = new_text.len();
+            
+            println!("Document changes: {} items, last change size: {} bytes", 
+                   params.content_changes.len(), text_length);
             
             {
                 let document_data = self.document_data.write().await;
@@ -379,24 +385,33 @@ impl LanguageServer for RustLanguageServer {
                 if document_data.contains_key(&uri) {
                     if let Some(mut data) = document_data.get_mut(&uri) {
                         data.content = new_content;
+                        println!("Updated existing document content in memory cache");
                     }
                 } else {
                     document_data.insert(uri.clone(), DocumentData {
                         content: new_content,
                         diagnostics: Vec::new(),
                     });
+                    println!("Created new document entry in memory cache");
                 }
             }
             
             if let Some(mut content) = self.document_states.get_mut(&uri) {
                 *content = new_text.clone();
+                println!("Updated document in document states collection");
             } else {
                 self.document_states.insert(uri.clone(), new_text);
+                println!("Added document to document states collection");
             }
+        } else {
+            println!("Warning: Received didChange with empty content changes");
         }
         
+        println!("Sending didChange notification to rust-analyzer");
         if let Err(e) = self.send_notification("textDocument/didChange", params).await {
             println!("Failed to send didChange notification: {}", e);
+        } else {
+            println!("Successfully sent didChange notification to rust-analyzer");
         }
     }
 

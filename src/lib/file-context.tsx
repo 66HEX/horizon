@@ -1,6 +1,6 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import { useFileStore } from './stores';
-import { FileInfo, DirectoryItem } from './file-service';
+import { useFileStore } from '@/lib/stores/file-store';
+import { FileInfo, DirectoryItem } from '@/lib/file-service';
 
 interface FileContextType {
   currentFile: FileInfo | null;
