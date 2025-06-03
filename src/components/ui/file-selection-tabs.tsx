@@ -11,7 +11,7 @@ export function FileSelectionTabs() {
   }
 
   return (
-    <div className="flex h-10 items-center gap-1 px-2">
+    <div className="flex h-10 items-center gap-2 px-2 overflow-hidden">
       <Tabs value={activeFilePath || undefined} className="w-full">
         <TabsList className="h-8 w-fit flex gap-1 bg-transparent p-0">
           {openFiles.map((file) => {
@@ -22,7 +22,7 @@ export function FileSelectionTabs() {
                 value={file.path}
                 className={cn(
                   "group relative flex h-8 cursor-pointer items-center gap-1 rounded-md px-2 text-sm transition-colors",
-                  "data-[state=active]:bg-sidebar-accent/20 data-[state=active]:text-foreground",
+                  "data-[state=active]:bg-sidebar-accent data-[state=active]:text-foreground",
                   "data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-sidebar-accent/10",
                   "border border-sidebar-border/20"
                 )}

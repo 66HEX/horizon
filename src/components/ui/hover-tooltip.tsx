@@ -30,7 +30,7 @@ export type EnhancedHoverData = {
 }
 
 const hoverVariants = cva(
-  "absolute z-50 max-w-sm shadow-lg animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+  "absolute z-50 shadow-lg w-[476px] animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
   {
     variants: {
       variant: {
@@ -69,7 +69,7 @@ const getContentTypeIcon = (type: ContentType) => {
 }
 
 const EnhancedHoverTooltip = React.forwardRef<HTMLDivElement, EnhancedHoverTooltipProps>(
-  ({ className, variant, data, position, onClose, maxHeight = 400, maxWidth = 600, ...props }, ref) => {
+  ({ className, variant, data, position, onClose, maxHeight = 400, maxWidth = 628, ...props }, ref) => {
     const cardRef = React.useRef<HTMLDivElement>(null)
     const [calculatedPosition, setCalculatedPosition] = React.useState(position)
 
@@ -128,7 +128,7 @@ const EnhancedHoverTooltip = React.forwardRef<HTMLDivElement, EnhancedHoverToolt
       h5: "text-xs font-medium mt-1 mb-1",
       h6: "text-xs font-medium mt-1 mb-1",
       
-      p: "text-sm text-primary/90 my-1",
+      p: "text-sm text-primary/90 my-1 w-md max-w-[600px]",
       a: "text-primary hover:text-primary/80",
       strong: "text-primary/90 font-bold",
       em: "text-primary/90 italic",
@@ -137,8 +137,8 @@ const EnhancedHoverTooltip = React.forwardRef<HTMLDivElement, EnhancedHoverToolt
       ol: "text-sm text-primary/90 list-decimal pl-4 my-1",
       li: "text-sm text-primary/90 my-0.5",
       
-      pre: "bg-muted/80 rounded my-2 p-2",
-      code: "font-mono text-xs bg-muted/80 px-1 py-0.5 rounded text-primary/50",
+      pre: "bg-muted/80 rounded my-2 p-2 w-md max-w-[600px] overflow-x-auto",
+      code: "font-mono text-xs bg-muted/80 px-1 py-0.5 rounded text-primary/50 w-md max-w-[600px] overflow-x-auto",
       inlineCode: "font-mono text-xs bg-[#232323] px-1 py-0.5 rounded text-primary/50",
       
       blockquote: "border-l-2 border-primary/20 pl-3 italic my-2 text-primary/80",
@@ -165,9 +165,9 @@ const EnhancedHoverTooltip = React.forwardRef<HTMLDivElement, EnhancedHoverToolt
         }}
         {...props}
       >
-        <Card ref={cardRef} className="max-w-sm overflow-hidden">
+        <Card ref={cardRef} className="overflow-hidden">
           <ScrollArea className="relative w-full" style={{ maxHeight: `${maxHeight}px` }}>
-            <div className="p-3 pb-2 flex items-center gap-2">
+            <div className="p-3 pb-2 flex items-center gap-2 max-w-[476px]">
               {getContentTypeIcon(data.metadata.content_type)}
               <h4 className="font-semibold text-sm flex-1 truncate">{data.title}</h4>
               <span className="text-xs text-muted-foreground">

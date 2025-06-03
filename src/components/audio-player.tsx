@@ -13,7 +13,7 @@ import {
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { useAudioStore } from '@/lib/stores';
+import { useAudioStore } from '@/lib/stores/audio-store';
 
 export interface AudioPlayerProps {
   src: string;

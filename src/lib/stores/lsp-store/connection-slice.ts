@@ -1,119 +1,69 @@
-import { create } from 'zustand';
+import { StateCreator } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
-import { EnhancedHoverData as UIEnhancedHoverData } from "@/components/ui/hover-tooltip";
+import { LspStoreState, DiagnosticItem } from '@/lib/stores/lsp-store/types';
 
-export type CompletionItem = {
-  label: string;
-  kind: string;
-  detail?: string;
-  documentation?: string;
-};
-
-export type DiagnosticItem = {
-  message: string;
-  severity: 'error' | 'warning' | 'information' | 'hint';
-  range: {
-    start: { line: number; character: number };
-    end: { line: number; character: number };
-  };
-};
-
-export type EnhancedHoverData = {
-  title: string;
-  signature: string | null;
-  documentation: string | null;
-  source_code: string | null;
-  raw: string;
-  metadata: DocumentationMetadata;
-};
-
-export type DocumentationMetadata = {
-  has_code_blocks: boolean;
-  has_tables: boolean;
-  has_lists: boolean;
-  content_type: ContentType;
-  warning_messages: string[];
-};
-
-export type ContentType = 'function' | 'struct' | 'variable' | 'module' | 'generic';
-
-export type HoverInfo = {
-  contents: string;
-  enhancedContents?: UIEnhancedHoverData;
-  range?: {
-    start: { line: number; character: number };
-    end: { line: number; character: number };
-  };
-};
-
-export type Position = {
-  line: number;
-  character: number;
-};
-
-export type Location = {
-  file_path: string;
-  range: {
-    start: Position;
-    end: Position;
-  };
-};
-
-export type TextEdit = {
-  range: {
-    start: Position;
-    end: Position;
-  };
-  newText: string;
-};
-
-enum TextDocumentSyncKind {
-  None = 0,
-  Full = 1,
-  Incremental = 2
+/**
+ * Interface for WebSocket client that communicates with the LSP server
+ */
+export interface LspWebSocketClient {
+  connect(): Promise<void>;
+  initializeLanguageServer(language: string, rootPath: string): Promise<any>;
+  sendRequest<T>(request: any): Promise<T>;
+  notifyDocumentOpened(filePath: string, language: string, content: string): Promise<void>;
+  notifyDocumentChanged(filePath: string, content: string, version: number): Promise<void>;
+  notifyDocumentClosed(filePath: string): Promise<void>;
+  sendNotification(method: string, params: any): Promise<void>;
+  disconnectWebSocket(): void;
+  registerNotificationHandler(method: string, handler: (params: any) => void): void;
+  unregisterNotificationHandler(method: string): void;
+  getServerCapabilities(): any;
+  getServerInfo(): any;
+  mapDiagnosticItems(items: any[]): any[];
 }
 
-export type LspRequest = 
-  | { type: 'Initialize', payload: { language: string, root_path: string } }
-  | { type: 'Completion', payload: { file_path: string, position: Position } }
-  | { type: 'Hover', payload: { file_path: string, position: Position } }
-  | { type: 'Definition', payload: { file_path: string, position: Position } }
-  | { type: 'References', payload: { file_path: string, position: Position } }
-  | { type: 'Formatting', payload: { file_path: string } };
-
-export type LspResponse = 
-  | { type: 'Initialized', payload: { success: boolean, message: string } }
-  | { type: 'Completion', payload: { items: CompletionItem[] } }
-  | { type: 'Hover', payload: { contents: string | null } }
-  | { type: 'Definition', payload: { location: Location | null } }
-  | { type: 'References', payload: { locations: Location[] } }
-  | { type: 'Formatting', payload: { edits: TextEdit[] } }
-  | { type: 'Error', payload: { message: string } };
-
-class LspWebSocketClient {
+/**
+ * Implementation of the WebSocket client for LSP communication
+ */
+export class LspWebSocketClientImpl implements LspWebSocketClient {
   private socket: WebSocket | null = null;
   private requestCallbacks = new Map<string, (response: any) => void>();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectInterval = 1000;
   private isConnecting = false;
-  private messageQueue: { request: LspRequest, resolve: (value: any) => void, reject: (reason: any) => void }[] = [];
+  private messageQueue: { request: any, resolve: (value: any) => void, reject: (reason: any) => void }[] = [];
   private connectionPromise: Promise<void> | null = null;
   private nextRequestId = 1;
   private serverCapabilities: any = null;
   private serverInfo: any = null;
   private notificationHandlers = new Map<string, (params: any) => void>();
 
+  /**
+   * Create a new WebSocket client for LSP communication
+   * @param url - WebSocket URL to connect to
+   */
   constructor(private readonly url: string) {}
 
+  /**
+   * Get the server capabilities
+   * @returns Server capabilities object or null
+   */
   getServerCapabilities(): any {
     return this.serverCapabilities;
   }
 
+  /**
+   * Get the server info
+   * @returns Server info object or null
+   */
   getServerInfo(): any {
     return this.serverInfo;
   }
 
+  /**
+   * Connect to the WebSocket server
+   * @returns Promise that resolves when connection is established
+   */
   async connect(): Promise<void> {
     if (this.socket?.readyState === WebSocket.OPEN) {
       return Promise.resolve();
@@ -166,10 +116,11 @@ class LspWebSocketClient {
               console.log('LSP Server info:', this.serverInfo);
             }
             else if (!response.id && response.method) {
-              console.log(`Otrzymano powiadomienie LSP: ${response.method}`);
+              console.log(`Received LSP notification: ${response.method}`);
               
               if (response.method === 'textDocument/publishDiagnostics') {
                 console.log(`Processing diagnostics notification with ${response.params?.diagnostics?.length || 0} items`);
+                console.log('Diagnostics details:', JSON.stringify(response.params?.diagnostics, null, 2));
               }
               
               const handler = this.notificationHandlers.get(response.method);
@@ -210,12 +161,25 @@ class LspWebSocketClient {
     
     return this.connectionPromise;
   }
+  
 
+  /**
+   * Initialize the language server for a specific language
+   * @param language - Language identifier
+   * @param rootPath - Root path of the project
+   * @returns Promise that resolves with initialization result
+   */
   async initializeLanguageServer(language: string, rootPath: string): Promise<any> {
     console.log(`Initializing LSP server for language: ${language}, rootPath: ${rootPath}`);
     
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       await this.connect();
+    }
+
+    enum TextDocumentSyncKind {
+      None = 0,
+      Full = 1,
+      Incremental = 2
     }
     
     const requestId = this.nextRequestId++;
@@ -331,38 +295,13 @@ class LspWebSocketClient {
       }
     });
   }
-  
-  async notifyDocumentOpened(filePath: string, language: string, content: string): Promise<void> {
-    return this.sendNotification("textDocument/didOpen", {
-      textDocument: {
-        uri: `file://${filePath}`,
-        languageId: language,
-        version: 1,
-        text: content
-      }
-    });
-  }
-  
-  async notifyDocumentChanged(filePath: string, content: string, version: number): Promise<void> {
-    return this.sendNotification("textDocument/didChange", {
-      textDocument: {
-        uri: `file://${filePath}`,
-        version: version
-      },
-      contentChanges: [
-        { text: content }
-      ]
-    });
-  }
-  
-  async notifyDocumentClosed(filePath: string): Promise<void> {
-    return this.sendNotification("textDocument/didClose", {
-      textDocument: {
-        uri: `file://${filePath}`
-      }
-    });
-  }
-  
+
+  /**
+   * Send a notification to the language server
+   * @param method - Method name
+   * @param params - Parameters for the notification
+   * @returns Promise that resolves when notification is sent
+   */
   async sendNotification(method: string, params: any): Promise<void> {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       await this.connect();
@@ -381,7 +320,12 @@ class LspWebSocketClient {
     }
   }
 
-  async sendRequest<T extends LspResponse>(request: LspRequest): Promise<T> {
+  /**
+   * Send a request to the language server
+   * @param request - Request object
+   * @returns Promise that resolves with response
+   */
+  async sendRequest<T>(request: any): Promise<T> {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       if (this.isConnecting) {
         return new Promise<T>((resolve, reject) => {
@@ -430,8 +374,111 @@ class LspWebSocketClient {
       }
     });
   }
+
+  /**
+   * Notify the language server that a document has been opened
+   * @param filePath - Path of the opened file
+   * @param language - Language identifier of the file
+   * @param content - Content of the file
+   * @returns Promise that resolves when notification is sent
+   */
+  notifyDocumentOpened(filePath: string, language: string, content: string): Promise<void> {
+    return this.sendNotification("textDocument/didOpen", {
+      textDocument: {
+        uri: `file://${filePath}`,
+        languageId: language,
+        version: 1,
+        text: content
+      }
+    });
+  }
   
-  private mapRequestTypeToMethod(type: LspRequest["type"]): string {
+  /**
+   * Notify the language server that a document has been changed
+   * @param filePath - Path of the changed file
+   * @param content - New content of the file
+   * @param version - Version number of the document
+   * @returns Promise that resolves when notification is sent
+   */
+  notifyDocumentChanged(filePath: string, content: string, version: number): Promise<void> {
+    console.log(`Notifying LSP server about document change: ${filePath} (version ${version}, content length: ${content.length})`);
+    return this.sendNotification("textDocument/didChange", {
+      textDocument: {
+        uri: `file://${filePath}`,
+        version: version
+      },
+      contentChanges: [
+        { text: content }
+      ]
+    });
+  }
+  
+  /**
+   * Notify the language server that a document has been closed
+   * @param filePath - Path of the closed file
+   * @returns Promise that resolves when notification is sent
+   */
+  notifyDocumentClosed(filePath: string): Promise<void> {
+    return this.sendNotification("textDocument/didClose", {
+      textDocument: {
+        uri: `file://${filePath}`
+      }
+    });
+  }
+
+  /**
+   * Disconnect from the WebSocket server
+   */
+  disconnectWebSocket() {
+    if (this.socket) {
+      this.socket.close();
+      this.socket = null;
+    }
+  }
+
+  /**
+   * Register a handler for a specific notification method
+   * @param method - Notification method to handle
+   * @param handler - Handler function
+   */
+  registerNotificationHandler(method: string, handler: (params: any) => void): void {
+    console.log(`Registering notification handler for ${method}`);
+    this.notificationHandlers.set(method, handler);
+  }
+
+  /**
+   * Unregister a handler for a specific notification method
+   * @param method - Notification method to unregister
+   */
+  unregisterNotificationHandler(method: string): void {
+    console.log(`Unregistering notification handler for ${method}`);
+    this.notificationHandlers.delete(method);
+  }
+
+  /**
+   * Map diagnostic items from LSP format to app format
+   * @param items - Diagnostic items in LSP format
+   * @returns Mapped diagnostic items
+   */
+  mapDiagnosticItems(items: any[]): any[] {
+    return items.map(item => ({
+      message: item.message || 'No message provided',
+      severity: this.mapDiagnosticSeverity(item.severity),
+      range: {
+        start: {
+          line: item.range?.start?.line || 0,
+          character: item.range?.start?.character || 0
+        },
+        end: {
+          line: item.range?.end?.line || 0,
+          character: item.range?.end?.character || 0
+        }
+      }
+    }));
+  }
+
+  // Private helper methods
+  private mapRequestTypeToMethod(type: string): string {
     switch (type) {
       case 'Initialize': return 'initialize';
       case 'Completion': return 'textDocument/completion';
@@ -443,7 +490,7 @@ class LspWebSocketClient {
     }
   }
   
-  private mapRequestPayloadToParams(request: LspRequest): any {
+  private mapRequestPayloadToParams(request: any): any {
     if (request.type === 'Initialize') {
       const { language, root_path } = request.payload as any;
       return {
@@ -456,7 +503,7 @@ class LspWebSocketClient {
           textDocument: {
             synchronization: {
               didSave: true,
-              didChange: TextDocumentSyncKind.Full
+              didChange: 1 // TextDocumentSyncKind.Full
             },
             completion: {
               completionItem: {
@@ -546,78 +593,70 @@ class LspWebSocketClient {
     throw new Error(`Unknown request type: ${(request as any).type}`);
   }
   
-  private mapJsonRpcResponseToLspResponse(requestType: string, result: any): LspResponse {
+  private mapJsonRpcResponseToLspResponse(requestType: string, result: any): any {
     switch (requestType) {
       case 'Initialize':
-        const initResponse: { type: 'Initialized', payload: { success: boolean, message: string } } = {
+        return {
           type: 'Initialized',
           payload: {
             success: true,
             message: 'Server initialized successfully'
           }
         };
-        return initResponse;
       
       case 'Completion':
-        const completionResponse: { type: 'Completion', payload: { items: CompletionItem[] } } = {
+        return {
           type: 'Completion',
           payload: {
             items: this.mapCompletionItems(result?.items || [])
           }
         };
-        return completionResponse;
       
       case 'Hover':
-        const hoverResponse: { type: 'Hover', payload: { contents: string | null } } = {
+        return {
           type: 'Hover',
           payload: {
             contents: this.extractHoverContents(result)
           }
         };
-        return hoverResponse;
       
       case 'Definition':
-        const definitionResponse: { type: 'Definition', payload: { location: Location | null } } = {
+        return {
           type: 'Definition',
           payload: {
             location: this.mapLocation(result)
           }
         };
-        return definitionResponse;
       
       case 'References':
         const locations = Array.isArray(result) 
-          ? result.map(this.mapLocation).filter((loc): loc is Location => loc !== null) 
+          ? result.map(this.mapLocation).filter((loc): loc is any => loc !== null) 
           : [];
         
-        const referencesResponse: { type: 'References', payload: { locations: Location[] } } = {
+        return {
           type: 'References',
           payload: { locations }
         };
-        return referencesResponse;
       
       case 'Formatting':
-        const formattingResponse: { type: 'Formatting', payload: { edits: TextEdit[] } } = {
+        return {
           type: 'Formatting',
           payload: {
             edits: this.mapTextEdits(result || [])
           }
         };
-        return formattingResponse;
       
       default:
-        const errorResponse: { type: 'Error', payload: { message: string } } = {
+        return {
           type: 'Error',
           payload: {
             message: `Unknown response type for request: ${requestType}`
           }
         };
-        return errorResponse;
     }
   }
   
-  
-  private mapCompletionItems(items: any[]): CompletionItem[] {
+  private mapCompletionItems(items: any[]): any[] {
     return items.map(item => ({
       label: item.label,
       kind: this.mapCompletionItemKind(item.kind),
@@ -681,7 +720,7 @@ class LspWebSocketClient {
     return null;
   }
   
-  private mapLocation(location: any): Location | null {
+  private mapLocation(location: any): any | null {
     if (!location) return null;
     
     try {
@@ -711,7 +750,7 @@ class LspWebSocketClient {
     }
   }
   
-  private mapTextEdits(edits: any[]): TextEdit[] {
+  private mapTextEdits(edits: any[]): any[] {
     return edits.map(edit => ({
       range: {
         start: {
@@ -726,23 +765,6 @@ class LspWebSocketClient {
       newText: edit.newText
     }));
   }
-
-  mapDiagnosticItems(items: any[]): DiagnosticItem[] {
-    return items.map(item => ({
-      message: item.message || 'No message provided',
-      severity: this.mapDiagnosticSeverity(item.severity),
-      range: {
-        start: {
-          line: item.range?.start?.line || 0,
-          character: item.range?.start?.character || 0
-        },
-        end: {
-          line: item.range?.end?.line || 0,
-          character: item.range?.end?.character || 0
-        }
-      }
-    }));
-  }
   
   private mapDiagnosticSeverity(severity: number): 'error' | 'warning' | 'information' | 'hint' {
     switch (severity) {
@@ -753,65 +775,57 @@ class LspWebSocketClient {
       default: return 'information';
     }
   }
-
-  disconnectWebSocket() {
-    if (this.socket) {
-      this.socket.close();
-      this.socket = null;
-    }
-  }
-
-  registerNotificationHandler(method: string, handler: (params: any) => void): void {
-    console.log(`Registering notification handler for ${method}`);
-    this.notificationHandlers.set(method, handler);
-  }
-
-  unregisterNotificationHandler(method: string): void {
-    console.log(`Unregistering notification handler for ${method}`);
-    this.notificationHandlers.delete(method);
-  }
 }
 
-interface LspState {
+/**
+ * Interface for connection-related state and operations
+ */
+export interface ConnectionSlice {
+  /**
+   * State properties
+   */
   isServerRunning: boolean;
   isWebSocketRunning: boolean;
   webSocketClient: LspWebSocketClient | null;
   currentLanguage: string | null;
-  currentFilePath: string | null;
   rootPath: string | null;
-  completions: CompletionItem[];
-  diagnostics: DiagnosticItem[];
-  isLoading: boolean;
-  error: string | null;
+  filesDiagnostics: Record<string, DiagnosticItem[]>;
   
+  /**
+   * Connection action methods
+   */
   startLspWebSocketServer: (port: number) => Promise<void>;
   stopLspWebSocketServer: () => Promise<void>;
   startLspServer: (language: string, rootPath: string) => Promise<void>;
   connectToWebSocket: (url: string) => Promise<void>;
   disconnectWebSocket: () => void;
-  getCompletions: (filePath: string, position: Position) => Promise<CompletionItem[]>;
-  getDiagnostics: (filePath: string) => Promise<DiagnosticItem[]>;
-  getHoverInfo: (filePath: string, position: Position) => Promise<HoverInfo | null>;
-  gotoDefinition: (filePath: string, position: Position) => Promise<Location | null>;
-  setCurrentFile: (filePath: string | null, language: string | null) => void;
-  openDocument: (filePath: string, language: string, content: string) => Promise<void>;
-  updateDocument: (filePath: string, content: string, version: number) => Promise<void>;
-  closeDocument: (filePath: string) => Promise<void>;
-  formatDocument: (filePath: string) => Promise<TextEdit[]>;
 }
 
-export const useLspStore = create<LspState>((set, get) => ({
+/**
+ * Creator function for the connection operations slice
+ * @returns Connection slice with state and actions for connection operations
+ */
+export const createConnectionSlice: StateCreator<
+  LspStoreState, 
+  [], 
+  [], 
+  ConnectionSlice
+> = (set, get) => ({
+  /**
+   * State properties
+   */
   isServerRunning: false,
   isWebSocketRunning: false,
   webSocketClient: null,
   currentLanguage: null,
-  currentFilePath: null,
   rootPath: null,
-  completions: [],
-  diagnostics: [],
-  isLoading: false,
-  error: null,
+  filesDiagnostics: {},
   
+  /**
+   * Start the LSP WebSocket server
+   * @param port - Port to run the server on
+   * @returns Promise that resolves when server is started
+   */
   startLspWebSocketServer: async (port) => {
     set({ isLoading: true, error: null });
     try {
@@ -862,6 +876,10 @@ export const useLspStore = create<LspState>((set, get) => ({
     }
   },
   
+  /**
+   * Stop the LSP WebSocket server
+   * @returns Promise that resolves when server is stopped
+   */
   stopLspWebSocketServer: async () => {
     set({ isLoading: true, error: null });
     
@@ -883,6 +901,12 @@ export const useLspStore = create<LspState>((set, get) => ({
     }
   },
   
+  /**
+   * Start the LSP server for a specific language
+   * @param language - Language identifier
+   * @param rootPath - Root path of the project
+   * @returns Promise that resolves when server is started
+   */
   startLspServer: async (language: string, rootPath: string) => {
     set({ isLoading: true, error: null });
     try {
@@ -916,9 +940,14 @@ export const useLspStore = create<LspState>((set, get) => ({
     }
   },
   
+  /**
+   * Connect to a WebSocket server
+   * @param url - WebSocket URL to connect to
+   * @returns Promise that resolves when connection is established
+   */
   connectToWebSocket: async (url) => {
     try {
-      const client = new LspWebSocketClient(url);
+      const client = new LspWebSocketClientImpl(url);
       await client.connect();
       
       client.registerNotificationHandler('textDocument/publishDiagnostics', (params) => {
@@ -937,12 +966,24 @@ export const useLspStore = create<LspState>((set, get) => ({
         
         console.log(`Processed ${diagnosticItems.length} diagnostics for ${filePath}`);
         
-        const { currentFilePath } = get();
+        const { currentFilePath, filesDiagnostics } = get();
+        
+        // Store diagnostics by file path
+        const updatedFilesDiagnostics = {
+          ...filesDiagnostics,
+          [filePath]: diagnosticItems
+        };
+        
+        // Update the diagnostics for the current file and the filesDiagnostics map
         if (currentFilePath === filePath) {
-          set({ diagnostics: diagnosticItems });
-          console.log('Updated diagnostics in store');
+          set({ 
+            diagnostics: diagnosticItems,
+            filesDiagnostics: updatedFilesDiagnostics
+          });
+          console.log('Updated diagnostics in store for current file');
         } else {
-          console.log(`Ignoring diagnostics for ${filePath}, current file is ${currentFilePath}`);
+          set({ filesDiagnostics: updatedFilesDiagnostics });
+          console.log(`Stored diagnostics for ${filePath}, current file is ${currentFilePath}`);
         }
       });
       
@@ -972,231 +1013,14 @@ export const useLspStore = create<LspState>((set, get) => ({
     }
   },
   
+  /**
+   * Disconnect from the WebSocket server
+   */
   disconnectWebSocket: () => {
     const webSocketClient = get().webSocketClient;
     if (webSocketClient) {
       webSocketClient.disconnectWebSocket();
       set({ webSocketClient: null, isWebSocketRunning: false });
     }
-  },
-  
-  getCompletions: async (filePath, position) => {
-    const { isServerRunning, currentLanguage, webSocketClient } = get();
-    
-    if (!isServerRunning || !currentLanguage || !webSocketClient) {
-      return [];
-    }
-    
-    set({ isLoading: true, error: null });
-    
-    try {
-      const response = await webSocketClient.sendRequest<LspResponse>({
-        type: 'Completion',
-        payload: { file_path: filePath, position }
-      });
-      
-      if (response.type === 'Completion') {
-        const completions = response.payload.items;
-        set({ completions, isLoading: false });
-        return completions;
-      } else if (response.type === 'Error') {
-        throw new Error(response.payload.message);
-      } else {
-        throw new Error('Invalid response type');
-      }
-    } catch (error) {
-      set({ 
-        error: `Failed to get completions: ${error}`, 
-        isLoading: false 
-      });
-      return [];
-    }
-  },
-  
-  getDiagnostics: async (filePath) => {
-    const { isServerRunning, currentLanguage, webSocketClient, diagnostics } = get();
-    
-    if (!isServerRunning || !currentLanguage || !webSocketClient) {
-      return [];
-    }
-    
-    return diagnostics;
-  },
-  
-  getHoverInfo: async (filePath, position) => {
-    const { isServerRunning, currentLanguage, webSocketClient } = get();
-    
-    if (!isServerRunning || !currentLanguage || !webSocketClient) {
-      return null;
-    }
-    
-    try {
-      const response = await webSocketClient.sendRequest<LspResponse>({
-        type: 'Hover',
-        payload: { file_path: filePath, position }
-      });
-      
-      if (response.type === 'Hover') {
-        if (!response.payload.contents) {
-          return null;
-        }
-        
-        try {
-          try {
-            const enhancedData = await invoke<UIEnhancedHoverData>('format_hover_data_enhanced', { 
-              contents: response.payload.contents 
-            });
-            
-            return { 
-              contents: response.payload.contents,
-              enhancedContents: enhancedData
-            };
-          } catch (enhancedError) {
-            console.error('Enhanced formatting failed:', enhancedError);
-            return { contents: response.payload.contents };
-          }
-        } catch (formattingError) {
-          console.error('Error during hover formatting:', formattingError);
-          return { contents: response.payload.contents };
-        }
-      } else if (response.type === 'Error') {
-        throw new Error(response.payload.message);
-      } else {
-        throw new Error('Invalid response type');
-      }
-    } catch (error) {
-      set({ error: `Failed to get hover info: ${error}` });
-      return null;
-    }
-  },
-  
-  gotoDefinition: async (filePath, position) => {
-    const { isServerRunning, currentLanguage, webSocketClient } = get();
-    
-    if (!isServerRunning || !currentLanguage || !webSocketClient) {
-      return null;
-    }
-    
-    try {
-      const response = await webSocketClient.sendRequest<LspResponse>({
-        type: 'Definition',
-        payload: { file_path: filePath, position }
-      });
-      
-      if (response.type === 'Definition') {
-        return response.payload.location;
-      } else if (response.type === 'Error') {
-        throw new Error(response.payload.message);
-      } else {
-        throw new Error('Invalid response type');
-      }
-    } catch (error) {
-      set({ error: `Failed to go to definition: ${error}` });
-      return null;
-    }
-  },
-  
-  setCurrentFile: (filePath, language) => {
-    set({ 
-      currentFilePath: filePath, 
-      currentLanguage: language,
-      diagnostics: [] 
-    });
-  },
-  
-  openDocument: async (filePath: string, language: string, content: string) => {
-    const { isServerRunning, webSocketClient, currentLanguage } = get();
-    
-    if (!isServerRunning || !webSocketClient) {
-      throw new Error('LSP server is not running');
-    }
-    
-    try {
-      await webSocketClient.notifyDocumentOpened(filePath, language || currentLanguage || 'plaintext', content);
-      set({ currentFilePath: filePath, currentLanguage: language || currentLanguage });
-      
-    } catch (error) {
-      console.error('Failed to open document:', error);
-      set({ error: `Failed to open document: ${error}` });
-    }
-  },
-  
-  updateDocument: async (filePath: string, content: string, version: number = 1) => {
-    const { isServerRunning, webSocketClient, currentFilePath } = get();
-    
-    if (!isServerRunning || !webSocketClient) {
-      return;
-    }
-    
-    if (filePath !== currentFilePath) {
-      console.warn('Trying to update document that is not currently active');
-      return;
-    }
-    
-    try {
-      await webSocketClient.notifyDocumentChanged(filePath, content, version);
-    } catch (error) {
-      console.error('Failed to update document:', error);
-    }
-  },
-  
-  closeDocument: async (filePath: string) => {
-    const { isServerRunning, webSocketClient, currentFilePath } = get();
-    
-    if (!isServerRunning || !webSocketClient) {
-      return;
-    }
-    
-    try {
-      await webSocketClient.notifyDocumentClosed(filePath);
-      
-      if (filePath === currentFilePath) {
-        set({ currentFilePath: null, diagnostics: [] });
-      }
-    } catch (error) {
-      console.error('Failed to close document:', error);
-    }
-  },
-  
-  formatDocument: async (filePath) => {
-    const { isServerRunning, webSocketClient, currentLanguage } = get();
-    
-    if (!isServerRunning || !currentLanguage || !webSocketClient) {
-      return [];
-    }
-    
-    try {
-      const serverCapabilities = webSocketClient.getServerCapabilities();
-      if (serverCapabilities && 
-          !serverCapabilities.documentFormattingProvider) {
-        console.warn('LSP server does not support document formatting');
-        return [];
-      }
-      
-      const response = await webSocketClient.sendRequest<LspResponse>({
-        type: 'Formatting',
-        payload: { file_path: filePath }
-      });
-      
-      if (response.type === 'Formatting') {
-        return response.payload.edits;
-      } else if (response.type === 'Error') {
-        throw new Error(response.payload.message);
-      } else {
-        throw new Error('Invalid response type');
-      }
-    } catch (error) {
-      set({ error: `Failed to format document: ${error}` });
-      return [];
-    }
-  }
-}));
-
-window.addEventListener('beforeunload', () => {
-  const { stopLspWebSocketServer, isWebSocketRunning } = useLspStore.getState();
-  
-  if (isWebSocketRunning) {
-    stopLspWebSocketServer()
-      .catch(error => console.error('Error shutting down WebSocket server:', error));
   }
 });

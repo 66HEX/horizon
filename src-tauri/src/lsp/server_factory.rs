@@ -8,6 +8,7 @@ use tower_lsp::{LanguageServer, Client};
 use tower_lsp::jsonrpc::Result as LspResult;
 use tower_lsp::lsp_types::*;
 use url;
+use dashmap::DashMap;
 
 use crate::lsp::servers::rust::RustLanguageServer;
 use crate::lsp::logger;
@@ -33,9 +34,43 @@ pub trait ManagedLanguageServer: Send + Sync {
     fn get_capabilities(&self) -> Value;
 }
 
+/**
+ * Interface for WebSocket notification handlers
+ */
+pub type NotificationHandlerFn = Box<dyn Fn(serde_json::Value) + Send + Sync>;
+
+/**
+ * Proxy to a language server for remote operations
+ */
+pub struct ServerProxy {
+    server_id: String,
+    server_factory: Arc<ServerFactory>,
+}
+
+impl ServerProxy {
+    pub fn new(server_id: String, server_factory: Arc<ServerFactory>) -> Self {
+        Self {
+            server_id,
+            server_factory,
+        }
+    }
+    
+    pub async fn register_notification_handler(&self, method: &str, handler: NotificationHandlerFn) -> Result<()> {
+        self.server_factory.register_notification_handler(&self.server_id, method, handler).await
+    }
+    
+    pub async fn unregister_notification_handler(&self, method: &str) -> Result<()> {
+        self.server_factory.unregister_notification_handler(&self.server_id, method).await
+    }
+}
+
+/**
+ * Implementation of the server factory
+ */
 pub struct ServerFactory {
     servers: Mutex<HashMap<String, Arc<dyn ManagedLanguageServer>>>,
     next_id: Mutex<u64>,
+    notification_handlers: Arc<DashMap<String, HashMap<String, NotificationHandlerFn>>>,
 }
 
 impl ServerFactory {
@@ -43,6 +78,7 @@ impl ServerFactory {
         Self {
             servers: Mutex::new(HashMap::new()),
             next_id: Mutex::new(1),
+            notification_handlers: Arc::new(DashMap::new()),
         }
     }
     
@@ -334,6 +370,63 @@ impl ServerFactory {
         logger::info("ServerFactory", &format!("Directory is not the main project directory for language {}: {}", language, dir_path));
         false
     }
+
+    /**
+     * Get a server proxy for a specific server
+     */
+    pub fn get_server_proxy(&self, server_id: &str) -> Result<ServerProxy> {
+        let servers = self.servers.lock().unwrap();
+        if servers.contains_key(server_id) {
+            Ok(ServerProxy::new(server_id.to_string(), Arc::new(self.clone())))
+        } else {
+            Err(anyhow!("Server not found: {}", server_id))
+        }
+    }
+    
+    /**
+     * Register a notification handler for a specific server and method
+     */
+    pub async fn register_notification_handler(&self, server_id: &str, method: &str, handler: NotificationHandlerFn) -> Result<()> {
+        logger::info("ServerFactory", &format!("Registering notification handler for {} on server {}", method, server_id));
+        
+        let mut handlers = self.notification_handlers
+            .entry(server_id.to_string())
+            .or_insert_with(HashMap::new);
+        
+        handlers.insert(method.to_string(), handler);
+        
+        Ok(())
+    }
+    
+    /**
+     * Unregister a notification handler for a specific server and method
+     */
+    pub async fn unregister_notification_handler(&self, server_id: &str, method: &str) -> Result<()> {
+        logger::info("ServerFactory", &format!("Unregistering notification handler for {} on server {}", method, server_id));
+        
+        if let Some(mut entry) = self.notification_handlers.get_mut(server_id) {
+            entry.remove(method);
+        }
+        
+        Ok(())
+    }
+    
+    /**
+     * Process a notification from the language server
+     */
+    pub async fn process_notification(&self, server_id: &str, method: &str, params: serde_json::Value) -> Result<()> {
+        logger::info("ServerFactory", &format!("Processing notification {} from server {}", method, server_id));
+        
+        if let Some(handlers) = self.notification_handlers.get(server_id) {
+            if let Some(handler) = handlers.get(method) {
+                handler(params);
+                return Ok(());
+            }
+        }
+        
+        logger::info("ServerFactory", &format!("No handler registered for notification {} from server {}", method, server_id));
+        Ok(())
+    }
 }
 
 struct RustLspAdapter {
@@ -428,6 +521,54 @@ impl ManagedLanguageServer for RustLspAdapter {
                             return Ok("".to_string());
                         } else {
                             logger::info("ServerFactory", &format!("Failed to parse didOpen parameters"));
+                            return Ok("".to_string());
+                        }
+                    },
+                    "textDocument/didChange" => {
+                        logger::info("ServerFactory", &format!("Document change notification in Rust server"));
+                        
+                        if let Ok(change_params) = serde_json::from_value::<DidChangeTextDocumentParams>(params.clone()) {
+                            // Log the contents of the change to assist debugging
+                            if !change_params.content_changes.is_empty() {
+                                let changes_count = change_params.content_changes.len();
+                                let first_change_length = change_params.content_changes[0].text.len();
+                                logger::info("ServerFactory", &format!(
+                                    "Processing didChange with {} changes. First change length: {}",
+                                    changes_count, first_change_length
+                                ));
+                            } else {
+                                logger::info("ServerFactory", "Processing didChange with empty changes array");
+                            }
+                            
+                            self.server.did_change(change_params).await;
+                            
+                            return Ok("".to_string());
+                        } else {
+                            logger::error("ServerFactory", &format!("Failed to parse didChange parameters: {:?}", params));
+                            return Ok("".to_string());
+                        }
+                    },
+                    "textDocument/didSave" => {
+                        logger::info("ServerFactory", &format!("Document save notification in Rust server"));
+                        
+                        if let Ok(save_params) = serde_json::from_value::<DidSaveTextDocumentParams>(params.clone()) {
+                            self.server.did_save(save_params).await;
+                            
+                            return Ok("".to_string());
+                        } else {
+                            logger::error("ServerFactory", &format!("Failed to parse didSave parameters"));
+                            return Ok("".to_string());
+                        }
+                    },
+                    "textDocument/didClose" => {
+                        logger::info("ServerFactory", &format!("Document close notification in Rust server"));
+                        
+                        if let Ok(close_params) = serde_json::from_value::<DidCloseTextDocumentParams>(params.clone()) {
+                            self.server.did_close(close_params).await;
+                            
+                            return Ok("".to_string());
+                        } else {
+                            logger::error("ServerFactory", &format!("Failed to parse didClose parameters"));
                             return Ok("".to_string());
                         }
                     },
