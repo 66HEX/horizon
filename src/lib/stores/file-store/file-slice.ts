@@ -121,28 +121,10 @@ export const createFileSlice: StateCreator<
           return null;
         }
         
-        const editorContainer = document.querySelector('[data-editor-container]') as any;
-        if (editorContainer && editorContainer.__currentContent) {
-          content = editorContainer.__currentContent;
-          console.log("Using content from __currentContent, length:", content.length);
-        } 
-        else if (content.trim().length === 0) {
-          console.warn('Warning: Attempting to save empty content');
-          
-          if (currentFile.content && currentFile.content.length > 0) {
-            content = currentFile.content;
-            console.log("Using content from currentFile, length:", content.length);
-          }
-          else if (editorContainer) {
-            const editorContent = editorContainer.querySelector('.cm-content')?.textContent;
-            if (editorContent && editorContent.length > 0) {
-              content = editorContent;
-              console.log("Using content from .cm-content, length:", content.length);
-            }
-          }
-        }
+        console.log("Using provided content for", currentFile.path, "length:", content.length);
         
-        const file = await fileService.saveFile(content, false);
+        // Use saveFileToPath to avoid singleton currentFile issues
+        const file = await fileService.saveFileToPath(currentFile.path, content, currentFile.id);
         
         if (file) {
           set((state) => {
@@ -224,7 +206,8 @@ export const createFileSlice: StateCreator<
         }
       });
       
-      const editorContainer = document.querySelector('[data-editor-container]');
+      // Update content only for the specific editor container of this file
+      const editorContainer = document.querySelector(`[data-editor-container][data-file-path="${currentFile.path}"]`);
       if (editorContainer) {
         (editorContainer as any).__currentContent = content;
       }

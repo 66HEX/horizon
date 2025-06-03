@@ -39,37 +39,11 @@ const EditorContainer = memo(({ file, language, onChangeContent, onSave }: {
     onSave: () => void;
 }) => {
     
-    const currentContentRef = useRef(file.content);
-    
-    
-    useEffect(() => {
-        currentContentRef.current = file.content;
-        
-        const editorContainer = document.querySelector('[data-editor-container]');
-        if (editorContainer) {
-            (editorContainer as any).__currentContent = file.content;
-        }
-    }, [file.id, file.path, file.content]);
-    
     const handleChange = (content: string) => {
-        currentContentRef.current = content;
-        
-        const editorContainer = document.querySelector('[data-editor-container]');
-        if (editorContainer) {
-            (editorContainer as any).__currentContent = content;
-        }
-        
         onChangeContent(content);
     };
     
     const handleSave = () => {
-        const content = currentContentRef.current;
-        
-        const editorContainer = document.querySelector('[data-editor-container]');
-        if (editorContainer) {
-            (editorContainer as any).__currentContent = content;
-        }
-        
         onSave();
     };
         
@@ -114,48 +88,30 @@ function MainContent() {
 
     const handleSaveFile = useCallback(() => {
         if (currentFile) {
+            const editorContainer = document.querySelector(`[data-editor-container][data-file-path="${currentFile.path}"]`) as any;
             let contentToSave = '';
             
-            
-            const editorContainer = document.querySelector('[data-editor-container]') as any;
             if (editorContainer && editorContainer.__currentContent) {
                 contentToSave = editorContainer.__currentContent;
-                console.log(`[App] Getting content from __currentContent, length: ${contentToSave.length}`);
-            }
-            
-            else if (currentFile.content && currentFile.content.length > 0) {
+                console.log(`[App] Using fresh content from editor for ${currentFile.path}, length: ${contentToSave.length}`);
+            } else {
                 contentToSave = currentFile.content;
-                console.log(`[App] Falling back to currentFile.content, length: ${contentToSave.length}`);
-            }
-            
-            else if (editorContainer) {
-                const editorContent = editorContainer.querySelector('.cm-content')?.textContent;
-                if (editorContent && editorContent.length > 0) {
-                    contentToSave = editorContent;
-                    console.log(`[App] Extracted content from DOM, length: ${contentToSave.length}`);
-                }
-            }
-            
-            if (contentToSave.length === 0) {
-                console.warn("[App] Warning: Content to save is empty!");
+                console.log(`[App] Fallback to store content for ${currentFile.path}, length: ${contentToSave.length}`);
             }
             
             saveFile(contentToSave);
         }
-    }, [saveFile, currentFile?.id, currentFile?.path, currentFile]);
+    }, [saveFile, currentFile]);
     
-    // Animowany toggle terminala
     const toggleTerminal = useCallback(() => {
         if (isTerminalAnimating) return;
         
         setIsTerminalAnimating(true);
         
         if (isTerminalVisible) {
-            // Ukrywanie terminala
             setIsTerminalVisible(false);
             setTimeout(() => setIsTerminalAnimating(false), 300);
         } else {
-            // Pokazywanie terminala
             setIsTerminalVisible(true);
             setTimeout(() => setIsTerminalAnimating(false), 300);
         }

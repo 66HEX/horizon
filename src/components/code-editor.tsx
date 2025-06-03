@@ -127,7 +127,6 @@ export interface CodeEditorProps {
   filePath?: string
 }
 
-
 function mapLspDiagnosticsToCM(diagnostics: DiagnosticItem[]): CMDiagnostic[] {
   return diagnostics.map(diag => ({
     from: diag.range.start.character,
@@ -139,17 +138,6 @@ function mapLspDiagnosticsToCM(diagnostics: DiagnosticItem[]): CMDiagnostic[] {
 }
 
 
-function getCursorPosition(view: EditorView) {
-  const pos = view.state.selection.main.head;
-  const line = view.state.doc.lineAt(pos);
-  
-  return {
-    line: line.number - 1, 
-    character: pos - line.from 
-  };
-}
-
-// Debug panel to show LSP data
 function LspDebugPanel({ data }: { data: any }) {
   if (!data) return null;
   
@@ -176,7 +164,6 @@ function LspDebugPanel({ data }: { data: any }) {
   );
 }
 
-// Typescript interface for debug data
 interface LspDebugData {
   completionRequests: Array<any>;
   completionResponses: Array<any>;
@@ -185,7 +172,6 @@ interface LspDebugData {
   error: any;
 }
 
-// Global debug state for LSP
 const lspDebugData: LspDebugData = {
   completionRequests: [],
   completionResponses: [],
@@ -194,7 +180,6 @@ const lspDebugData: LspDebugData = {
   error: null
 };
 
-// Helper to show debug data in UI
 function showLspDebugData() {
   let debugElement = document.querySelector('[data-lsp-debug="true"]');
   
@@ -209,9 +194,7 @@ function showLspDebugData() {
     debugElement as HTMLElement
   );
   
-  // Using requestAnimationFrame to ensure the portal is rendered
   requestAnimationFrame(() => {
-    // Force rendering
   });
 }
 
@@ -222,11 +205,9 @@ const lspCompletion = (context: CompletionContext) => {
   const lineEnd = line.to;
   const cursorPos = pos - lineStart;
 
-  // Get LSP store state and functions
   const { getCompletions, currentFilePath } = useLspStore.getState();
   const filePath = useLspStore.getState().currentFilePath;
   
-  // Debug: Log request information
   const requestInfo = {
     timestamp: new Date().toISOString(),
     filePath: filePath,
@@ -240,10 +221,8 @@ const lspCompletion = (context: CompletionContext) => {
   lspDebugData.lastRequest = requestInfo;
   lspDebugData.completionRequests.push(requestInfo);
   
-  // Show debug panel
   showLspDebugData();
   
-  // Check if we have a valid file path
   if (!filePath || filePath !== currentFilePath) {
     lspDebugData.error = 'No valid file path or mismatch with current file';
     showLspDebugData();
@@ -251,16 +230,13 @@ const lspCompletion = (context: CompletionContext) => {
     return null;
   }
   
-  // Position in LSP format
   const lspPosition = {
     line: line.number - 1,
     character: cursorPos
   };
   
-  // Call LSP completions
   return getCompletions(filePath, lspPosition)
     .then(completions => {
-      // Debug: Log response
       const responseInfo = {
         timestamp: new Date().toISOString(),
         completionsCount: completions.length,
@@ -272,10 +248,8 @@ const lspCompletion = (context: CompletionContext) => {
       lspDebugData.completionResponses.push(responseInfo);
       lspDebugData.error = null;
       
-      // Show updated debug data
       showLspDebugData();
       
-      // Convert LSP completions to CodeMirror format
       const cmCompletions = completions.map(item => ({
         label: item.label,
         type: item.kind.toLowerCase(),
@@ -284,7 +258,6 @@ const lspCompletion = (context: CompletionContext) => {
         apply: item.label
       }));
       
-      // Find matching text before cursor
       const match = context.matchBefore(/[\w\d_\-\.]*/)
       const from = match ? lineStart + match.from : pos;
       
@@ -295,7 +268,6 @@ const lspCompletion = (context: CompletionContext) => {
       };
     })
     .catch(error => {
-      // Debug: Log error
       const errorInfo = {
         timestamp: new Date().toISOString(),
         message: error.message || String(error),
@@ -305,7 +277,6 @@ const lspCompletion = (context: CompletionContext) => {
       console.error('[LSP Debug] Completion Error:', errorInfo);
       lspDebugData.error = errorInfo;
       
-      // Show error in debug data
       showLspDebugData();
       
       return null;
@@ -443,12 +414,10 @@ export function CodeEditor({
           return newVersion;
         });
         
-        
-        const editorContainer = document.querySelector('[data-editor-container]');
+        const editorContainer = document.querySelector(`[data-editor-container][data-file-path="${filePath}"]`);
         if (editorContainer) {
           (editorContainer as any).__currentContent = content;
-        }
-        
+        } 
         onChange(content);
       };
       
@@ -511,13 +480,11 @@ export function CodeEditor({
     });
   };
 
-  
   useEffect(() => {
     
     hideHover();
     
     if (!editorRef.current) return;
-    
     
     if (viewRef.current) {
       viewRef.current.destroy();
@@ -525,13 +492,10 @@ export function CodeEditor({
       setEditorView(null);
     }
     
-    
-    
     const lspHoverExtension = createLspHover(
       new EditorView({state: EditorState.create({doc: ""})}), 
       showHover
     );
-    
     
     const state = EditorState.create({
       doc: initialValue,
@@ -583,8 +547,7 @@ export function CodeEditor({
     viewRef.current = view;
     setEditorView(view);
     
-    
-    const editorContainer = document.querySelector('[data-editor-container]');
+    const editorContainer = document.querySelector(`[data-editor-container][data-file-path="${filePath}"]`);
     if (editorContainer) {
       (editorContainer as any).__currentContent = initialValue;
     }
@@ -637,10 +600,8 @@ export function CodeEditor({
     );
   };
 
-  // Add keybinding to toggle debug panel
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Alt+D to toggle debug panel
       if (e.altKey && e.key === 'd') {
         const debugElement = document.querySelector('[data-lsp-debug="true"]');
         if (debugElement) {
@@ -658,7 +619,7 @@ export function CodeEditor({
   }, []);
 
   return (
-    <div className={cn("relative h-full w-full", className)} data-editor-container>
+    <div className={cn("relative h-full w-full", className)} data-editor-container data-file-path={filePath}>
       <ScrollArea className="h-full w-full overscroll-none">
         <div className="relative h-full overscroll-none" ref={editorRef} />
       </ScrollArea>
@@ -668,7 +629,6 @@ export function CodeEditor({
         document.body
       )}
       
-      {/* LSP Status Indicator */}
       <div className="absolute bottom-2 right-2 flex items-center gap-2 text-xs bg-background/80 px-2 py-1 rounded-md">
         <div 
           className={cn(

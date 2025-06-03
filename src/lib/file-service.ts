@@ -316,85 +316,143 @@ export class FileService {
     }
   }
 
-/**
- * Saves current file
- * @param content - Content to save
- * @param saveAs - Whether to show a file dialog
- * @returns FileInfo or null if cancelled
- */
-async saveFile(content: string, saveAs: boolean = false): Promise<FileInfo | null> {
-  try {
-    let filePath: string | null = null;
-    
-    if (saveAs || !this.currentFile) {
-      const selected = await save({
-        filters: [
-          { name: 'Source Code', extensions: ['js', 'jsx', 'ts', 'tsx', 'html', 'css', 'json'] },
-          { name: 'All Files', extensions: ['*'] }
-        ]
-      });
+  /**
+   * Saves content to a specific file path
+   * @param filePath - Path of the file to save to
+   * @param content - Content to save
+   * @param fileId - Optional file ID to preserve
+   * @returns FileInfo or null if failed
+   */
+  async saveFileToPath(filePath: string, content: string, fileId?: string): Promise<FileInfo | null> {
+    try {
+      const cleanContent = String(content);
       
-      if (!selected) {
-        return null;
+      console.log(`[FileService] Saving to specific path: ${filePath}, content length: ${cleanContent.length}`);
+      
+      await nativeFs.writeToFile(filePath, cleanContent);
+      
+      try {
+        await nativeFs.readFile(filePath);
+      } catch (error) {
+        console.error('[FileService] Error verifying saved content:', error);
       }
       
-      filePath = selected as string;
-    } else {
-      filePath = this.currentFile.path;
-    }
-    
-    const cleanContent = String(content);
-    
-    await nativeFs.writeToFile(filePath, cleanContent);
-    
-    try {
-      await nativeFs.readFile(filePath);
+      try {
+        const fileInfo = await nativeFs.getFileInfo(filePath);
+        
+        const updatedFile: FileInfo = {
+          id: fileId || fileInfo.id,
+          path: fileInfo.path,
+          name: fileInfo.name,
+          content: cleanContent,
+          isUnsaved: false
+        };
+        
+        console.log(`[FileService] Successfully saved to ${filePath}, returning file info with content length: ${updatedFile.content.length}`);
+        
+        // Don't update this.currentFile to avoid singleton issues
+        return updatedFile;
+      } catch (error) {
+        console.error('[FileService] Error getting file info after save, falling back to JS implementation:', error);
+        const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || 'unknown';
+        
+        const updatedFile: FileInfo = {
+          id: fileId || `${filePath}-${Date.now()}-${Math.random().toString(36).substring(2, 12)}`,
+          path: filePath,
+          name: fileName,
+          content: cleanContent,
+          isUnsaved: false
+        };
+        
+        console.log(`[FileService] Fallback save successful for ${filePath}, content length: ${updatedFile.content.length}`);
+        
+        return updatedFile;
+      }
     } catch (error) {
-      console.error('[FileService] Error verifying saved content:', error);
+      console.error('[FileService] Error saving file to path:', filePath, error);
+      throw error;
     }
-    
-    try {
-      const fileInfo = await nativeFs.getFileInfo(filePath);
-      const actualContent = cleanContent;
-      
-      const updatedFile: FileInfo = {
-        id: saveAs ? fileInfo.id : (this.currentFile?.id || fileInfo.id),
-        path: fileInfo.path,
-        name: fileInfo.name,
-        content: actualContent,
-        isUnsaved: false
-      };
-      
-      console.log(`[FileService] Returning updated file info with content length: ${updatedFile.content.length}`);
-      
-      this.currentFile = updatedFile;
-      return updatedFile;
-    } catch (error) {
-      console.error('[FileService] Error getting file info after save, falling back to JS implementation:', error);
-      const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || 'unknown';
-      
-      const id = saveAs 
-        ? `${filePath}-${Date.now()}-${Math.random().toString(36).substring(2, 12)}`
-        : (this.currentFile?.id || `${filePath}-${Date.now()}-${Math.random().toString(36).substring(2, 12)}`);
-      
-      const updatedFile: FileInfo = {
-        id,
-        path: filePath,
-        name: fileName,
-        content: cleanContent,
-        isUnsaved: false
-      };
-      
-      console.log(`[FileService] Returning file info from fallback with content length: ${updatedFile.content.length}`);
-      
-      this.currentFile = updatedFile;
-      return updatedFile;
-    }
-  } catch (error) {
-    console.error('[FileService] Error saving file:', error);
-    throw error;
   }
-}
+
+  /**
+   * Saves current file
+   * @param content - Content to save
+   * @param saveAs - Whether to show a file dialog
+   * @returns FileInfo or null if cancelled
+   */
+  async saveFile(content: string, saveAs: boolean = false): Promise<FileInfo | null> {
+    try {
+      let filePath: string | null = null;
+      
+      if (saveAs || !this.currentFile) {
+        const selected = await save({
+          filters: [
+            { name: 'Source Code', extensions: ['js', 'jsx', 'ts', 'tsx', 'html', 'css', 'json'] },
+            { name: 'All Files', extensions: ['*'] }
+          ]
+        });
+        
+        if (!selected) {
+          return null;
+        }
+        
+        filePath = selected as string;
+      } else {
+        filePath = this.currentFile.path;
+      }
+      
+      const cleanContent = String(content);
+      
+      await nativeFs.writeToFile(filePath, cleanContent);
+      
+      try {
+        await nativeFs.readFile(filePath);
+      } catch (error) {
+        console.error('[FileService] Error verifying saved content:', error);
+      }
+      
+      try {
+        const fileInfo = await nativeFs.getFileInfo(filePath);
+        const actualContent = cleanContent;
+        
+        const updatedFile: FileInfo = {
+          id: saveAs ? fileInfo.id : (this.currentFile?.id || fileInfo.id),
+          path: fileInfo.path,
+          name: fileInfo.name,
+          content: actualContent,
+          isUnsaved: false
+        };
+        
+        console.log(`[FileService] Returning updated file info with content length: ${updatedFile.content.length}`);
+        
+        this.currentFile = updatedFile;
+        return updatedFile;
+      } catch (error) {
+        console.error('[FileService] Error getting file info after save, falling back to JS implementation:', error);
+        const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || 'unknown';
+        
+        const id = saveAs 
+          ? `${filePath}-${Date.now()}-${Math.random().toString(36).substring(2, 12)}`
+          : (this.currentFile?.id || `${filePath}-${Date.now()}-${Math.random().toString(36).substring(2, 12)}`);
+        
+        const updatedFile: FileInfo = {
+          id,
+          path: filePath,
+          name: fileName,
+          content: cleanContent,
+          isUnsaved: false
+        };
+        
+        console.log(`[FileService] Returning file info from fallback with content length: ${updatedFile.content.length}`);
+        
+        this.currentFile = updatedFile;
+        return updatedFile;
+      }
+    } catch (error) {
+      console.error('[FileService] Error saving file:', error);
+      throw error;
+    }
+  }
 
   /**
    * Gets the current file
