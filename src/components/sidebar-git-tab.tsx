@@ -521,7 +521,7 @@ export function SidebarGitTab() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-4 w-4 p-0 text-destructive hover:text-destructive"
+                      className="h-4 w-4 p-0 text-destructive hover:text-destructive/90"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDiscardAll();

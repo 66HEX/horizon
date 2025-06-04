@@ -17,19 +17,19 @@ export function SidebarTabs({ activeTab, setActiveTab, diagnosticSummary }: Side
     <div className="w-12 bg-sidebar-accent/20 border-r border-sidebar-border flex flex-col items-center py-2">
       <button
         onClick={() => setActiveTab("files")}
-        className={`p-2 rounded-md mb-2 cursor-pointer ${activeTab === "files" ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/50"}`}
+        className={`p-2 rounded-md mb-2 cursor-pointer transition-all duration-300 ${activeTab === "files" ? "bg-sidebar-accent text-accent-foreground" : "hover:bg-sidebar-accent/50 hover:text-accent-foreground"}`}
       >
         <IconFolder className="h-4 w-4" />
       </button>
       <button
         onClick={() => setActiveTab("search")}
-        className={`p-2 rounded-md mb-2 cursor-pointer ${activeTab === "search" ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/50"}`}
+        className={`p-2 rounded-md mb-2 cursor-pointer transition-all duration-300 ${activeTab === "search" ? "bg-sidebar-accent text-accent-foreground" : "hover:bg-sidebar-accent/50 hover:text-accent-foreground"}`}
       >
         <IconSearch className="h-4 w-4" />
       </button>
       <button
         onClick={() => setActiveTab("diagnostics")}
-        className={`p-2 rounded-md mb-2 cursor-pointer relative ${activeTab === "diagnostics" ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/50"}`}
+        className={`p-2 rounded-md mb-2 cursor-pointer relative transition-all duration-300 ${activeTab === "diagnostics" ? "bg-sidebar-accent text-accent-foreground" : "hover:bg-sidebar-accent/50 hover:text-accent-foreground"}`}
       >
         <IconAlertTriangle className="h-4 w-4" />
         {diagnosticSummary.total > 0 && (
@@ -43,7 +43,7 @@ export function SidebarTabs({ activeTab, setActiveTab, diagnosticSummary }: Side
       </button>
       <button
         onClick={() => setActiveTab("git")}
-        className={`p-2 rounded-md cursor-pointer ${activeTab === "git" ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/50"}`}
+        className={`p-2 rounded-md cursor-pointer transition-all duration-300 ${activeTab === "git" ? "bg-sidebar-accent text-accent-foreground" : "hover:bg-sidebar-accent/50 hover:text-accent-foreground"}`}
       >
         <IconGitBranch className="h-4 w-4" />
       </button>
