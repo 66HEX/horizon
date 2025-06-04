@@ -68,6 +68,13 @@ pub struct GitPullResult {
     pub conflicts: Vec<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GitUserConfig {
+    pub name: String,
+    pub email: String,
+    pub has_config: bool,
+}
+
 fn format_timestamp(time: Time) -> String {
     let datetime = chrono::DateTime::from_timestamp(time.seconds(), 0)
         .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
@@ -656,4 +663,45 @@ pub fn discard_all_changes(repo_path: String) -> Result<String, String> {
     let files_count = statuses_before.len();
     
     Ok(format!("Discarded changes in {} files", files_count))
+}
+
+#[command]
+pub fn get_git_user_config(repo_path: String) -> Result<GitUserConfig, String> {
+    let repo = Repository::open(&repo_path).map_err(|e| e.to_string())?;
+    let config = repo.config().map_err(|e| e.to_string())?;
+    
+    // Try to get user name and email from git config
+    let name = match config.get_string("user.name") {
+        Ok(name) => name,
+        Err(_) => {
+            // Try global config if local config doesn't exist
+            match git2::Config::open_default() {
+                Ok(global_config) => {
+                    global_config.get_string("user.name").unwrap_or_else(|_| "Your Name".to_string())
+                }
+                Err(_) => "Your Name".to_string(),
+            }
+        }
+    };
+    
+    let email = match config.get_string("user.email") {
+        Ok(email) => email,
+        Err(_) => {
+            // Try global config if local config doesn't exist
+            match git2::Config::open_default() {
+                Ok(global_config) => {
+                    global_config.get_string("user.email").unwrap_or_else(|_| "your.email@example.com".to_string())
+                }
+                Err(_) => "your.email@example.com".to_string(),
+            }
+        }
+    };
+    
+    let has_config = name != "Your Name" && email != "your.email@example.com";
+    
+    Ok(GitUserConfig {
+        name,
+        email,
+        has_config,
+    })
 } 

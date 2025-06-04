@@ -163,6 +163,7 @@ export function SidebarGitTab() {
     commits,
     changes,
     remoteStatus,
+    userConfig,
     isLoading, 
     error,
     refreshGitData,
@@ -183,8 +184,10 @@ export function SidebarGitTab() {
   const [isChangesOpen, setIsChangesOpen] = useState(false);
   const [isStagedOpen, setIsStagedOpen] = useState(false);
   const [commitMessage, setCommitMessage] = useState("");
-  const [authorName, setAuthorName] = useState("Your Name");
-  const [authorEmail, setAuthorEmail] = useState("your.email@example.com");
+
+  // Use git config or fallback to defaults
+  const authorName = userConfig?.name || "Your Name";
+  const authorEmail = userConfig?.email || "your.email@example.com";
 
   const localBranches = useMemo(() => branches.filter(b => !b.is_remote), [branches]);
   const remoteBranches = useMemo(() => branches.filter(b => b.is_remote), [branches]);
@@ -370,6 +373,13 @@ export function SidebarGitTab() {
                 disabled={changes?.staged.length === 0}
                 className="text-xs h-7"
               />
+              
+              {userConfig && !userConfig.has_config && (
+                <div className="text-xs text-muted-foreground/70 px-1">
+                  Set git config: <code className="text-xs bg-muted px-1 rounded">git config --global user.name "Your Name"</code>
+                </div>
+              )}
+              
               <Button
                 onClick={handleCommit}
                 disabled={!commitMessage.trim() || isLoading || changes?.staged.length === 0}
@@ -378,6 +388,9 @@ export function SidebarGitTab() {
               >
                 <IconGitCommit className="h-3 w-3 mr-1" />
                 Commit {changes?.staged.length ? `(${changes.staged.length})` : ''}
+                {userConfig?.has_config && (
+                  <span className="ml-1 text-[10px] opacity-70">as {userConfig.name}</span>
+                )}
               </Button>
             </div>
 

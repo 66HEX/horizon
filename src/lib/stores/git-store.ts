@@ -59,6 +59,12 @@ export interface GitPullResult {
   conflicts: string[];
 }
 
+export interface GitUserConfig {
+  name: string;
+  email: string;
+  has_config: boolean;
+}
+
 interface GitStore {
   status: GitStatus | null;
   branches: GitBranch[];
@@ -68,6 +74,7 @@ interface GitStore {
   currentPath: string | null;
   isLoading: boolean;
   error: string | null;
+  userConfig: GitUserConfig | null;
   
   // Actions
   setCurrentPath: (path: string) => void;
@@ -78,6 +85,7 @@ interface GitStore {
   fetchRemoteStatus: (path: string) => Promise<void>;
   refreshGitData: (path: string) => Promise<void>;
   isGitRepository: (path: string) => Promise<boolean>;
+  getUserConfig: (path: string) => Promise<void>;
   
   // File operations
   stageFile: (repoPath: string, filePath: string) => Promise<void>;
@@ -104,6 +112,7 @@ export const useGitStore = create<GitStore>((set, get) => ({
   currentPath: null,
   isLoading: false,
   error: null,
+  userConfig: null,
 
   setCurrentPath: (path: string) => {
     set({ currentPath: path });
@@ -175,13 +184,14 @@ export const useGitStore = create<GitStore>((set, get) => ({
   },
 
   refreshGitData: async (path: string) => {
-    const { fetchGitStatus, fetchBranches, fetchCommits, fetchChanges, fetchRemoteStatus } = get();
+    const { fetchGitStatus, fetchBranches, fetchCommits, fetchChanges, fetchRemoteStatus, getUserConfig } = get();
     await Promise.all([
       fetchGitStatus(path),
       fetchBranches(path),
       fetchCommits(path),
       fetchChanges(path),
-      fetchRemoteStatus(path)
+      fetchRemoteStatus(path),
+      getUserConfig(path)
     ]);
   },
 
@@ -329,5 +339,18 @@ export const useGitStore = create<GitStore>((set, get) => ({
 
   clearError: () => {
     set({ error: null });
+  },
+
+  getUserConfig: async (path: string) => {
+    try {
+      set({ isLoading: true, error: null });
+      const userConfig = await invoke<GitUserConfig>('get_git_user_config', { repoPath: path });
+      set({ userConfig, isLoading: false });
+    } catch (error) {
+      set({ 
+        error: error instanceof Error ? error.message : 'Failed to get user config',
+        isLoading: false 
+      });
+    }
   }
 })); 
