@@ -1,6 +1,5 @@
-use git2::{Repository, Oid, ObjectType, BranchType, Time};
+use git2::{Repository, BranchType, Time};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 use tauri::command;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -107,6 +106,11 @@ pub fn get_git_branches(path: String) -> Result<Vec<GitBranch>, String> {
     for branch_result in remote_branches {
         let (branch, _) = branch_result.map_err(|e| e.to_string())?;
         if let Some(name) = branch.name().map_err(|e| e.to_string())? {
+            // Skip symbolic references like origin/HEAD
+            if name.ends_with("/HEAD") {
+                continue;
+            }
+            
             let commit_id = branch
                 .get()
                 .target()
