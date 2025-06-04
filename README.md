@@ -1,11 +1,6 @@
 # Horizon
 
-![Horizon Logo](logo.png)
-
-
 <div align="center">
-
-> ⚠️ **Note:** This project is currently under active development and may contain bugs or incomplete features. Use at your own risk.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-blue.svg)](https://tauri.app)
@@ -23,7 +18,11 @@
 [![Downloads](https://img.shields.io/github/downloads/66HEX/horizon/total)](https://github.com/66HEX/horizon/releases)
 [![Release](https://img.shields.io/github/release/66HEX/horizon)](https://github.com/66HEX/horizon/releases/latest)
 
+![Horizon Logo](logo.png)
+
 ![Horizon Editor Screenshot](screen.png)
+
+> ⚠️ **Note:** This project is currently under active development and may contain bugs or incomplete features. Use at your own risk.
 
 </div>
 
