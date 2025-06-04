@@ -2,6 +2,7 @@ pub mod terminal;
 pub mod process_tracker;
 pub mod fs;
 pub mod lsp;
+pub mod git;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -59,7 +60,11 @@ pub fn run() {
             lsp::stop_lsp_websocket_server,
             lsp::is_lsp_websocket_running,
             lsp::find_project_root,
-            lsp::format_hover_data_enhanced
+            lsp::format_hover_data_enhanced,
+            git::get_git_status,
+            git::get_git_branches,
+            git::get_git_commits,
+            git::is_git_repository
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
