@@ -4,7 +4,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Separator } from "@/components/ui/separator";
 import { 
   IconGitBranch, 
   IconGitCommit, 
@@ -24,22 +23,24 @@ interface BranchItemProps {
 }
 
 function BranchItem({ branch }: BranchItemProps) {
+  const displayName = branch.is_remote 
+    ? branch.name.replace('origin/', '') 
+    : branch.name;
+    
   return (
-    <div className={`flex items-center gap-2 p-2 rounded-md text-sm hover:bg-sidebar-accent/50 ${
+    <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs hover:bg-sidebar-accent/50 ${
       branch.is_current ? 'bg-sidebar-accent/30 font-medium' : ''
     }`}>
-      <IconGitBranch className="h-4 w-4 text-muted-foreground" />
-      <span className="flex-1 truncate">{branch.name}</span>
-      {branch.is_current && (
-        <Badge variant="secondary" className="text-xs">
-          current
-        </Badge>
-      )}
-      {branch.is_remote && (
-        <Badge variant="outline" className="text-xs">
-          remote
-        </Badge>
-      )}
+      <IconGitBranch className="h-3 w-3 text-muted-foreground shrink-0" />
+      <span className="flex-1 truncate" title={branch.name}>{displayName}</span>
+      <div className="flex gap-1 shrink-0">
+        {branch.is_current && (
+          <span className="text-[10px] text-muted-foreground/70">Local</span>
+        )}
+        {branch.is_remote && (
+          <span className="text-[10px] text-muted-foreground/70">Remote</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -55,47 +56,48 @@ function CommitItem({ commit }: CommitItemProps) {
     const now = Date.now() / 1000;
     const diff = now - timestamp;
     
-    if (diff < 60) return 'just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-    return commit.date;
+    if (diff < 60) return 'now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
+    return new Date(timestamp * 1000).toLocaleDateString();
   };
 
   return (
-    <div className="pb-3 last:pb-0">
+    <div className="px-2 py-1">
       <div 
-        className="flex items-start gap-2 p-2 rounded-md text-sm hover:bg-sidebar-accent/50 cursor-pointer"
+        className="flex items-start gap-1.5 p-1.5 pb-3 rounded text-xs hover:bg-sidebar-accent/50 cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <IconGitCommit className="h-4 w-4 text-muted-foreground mt-0.5" />
+        <IconGitCommit className="h-3 w-3 text-muted-foreground mt-0.5 shrink-0" />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-mono text-xs text-muted-foreground">{commit.short_id}</span>
-            <span className="text-xs text-muted-foreground">{formatRelativeTime(commit.timestamp)}</span>
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-mono text-[10px] text-muted-foreground">{commit.short_id}</span>
+            <span className="text-[10px] text-muted-foreground">{formatRelativeTime(commit.timestamp)}</span>
           </div>
-          <p className="text-xs truncate mb-1">{commit.message}</p>
+          <p className="text-xs leading-tight line-clamp-2 mb-1" title={commit.message}>
+            {commit.message}
+          </p>
           {isExpanded && (
-            <div className="space-y-1 text-xs text-muted-foreground">
+            <div className="space-y-1 mt-2 pt-2 border-t border-border/50">
               <div className="flex items-center gap-1">
-                <IconUser className="h-3 w-3" />
-                <span>{commit.author_name}</span>
-                {commit.author_email && (
-                  <span className="text-muted-foreground/70">({commit.author_email})</span>
-                )}
+                <IconUser className="h-3 w-3 text-muted-foreground" />
+                <span className="text-[10px] text-muted-foreground truncate">{commit.author_name}</span>
               </div>
               <div className="flex items-center gap-1">
-                <IconCalendar className="h-3 w-3" />
-                <span>{commit.date}</span>
+                <IconCalendar className="h-3 w-3 text-muted-foreground" />
+                <span className="text-[10px] text-muted-foreground">{commit.date}</span>
               </div>
             </div>
           )}
         </div>
-        {isExpanded ? (
-          <IconChevronDown className="h-4 w-4 text-muted-foreground" />
-        ) : (
-          <IconChevronRight className="h-4 w-4 text-muted-foreground" />
-        )}
+        <div className="shrink-0">
+          {isExpanded ? (
+            <IconChevronDown className="h-3 w-3 text-muted-foreground" />
+          ) : (
+            <IconChevronRight className="h-3 w-3 text-muted-foreground" />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -147,10 +149,10 @@ export function SidebarGitTab() {
           <SidebarGroupLabel className="mb-0">Git</SidebarGroupLabel>
         </div>
         <SidebarGroupContent className="relative overflow-hidden h-full">
-          <div className="mt-2 flex flex-col items-center justify-center h-full px-2 text-center text-muted-foreground">
-            <IconFolder className="h-8 w-8 mb-2" />
-            <p className="mb-2">No folder opened</p>
-            <p className="text-xs">Open a folder to see git information</p>
+          <div className="flex flex-col items-center justify-center h-full px-4 text-center text-muted-foreground">
+            <IconFolder className="h-6 w-6 mb-2" />
+            <p className="text-xs mb-1">No folder opened</p>
+            <p className="text-[10px] text-muted-foreground/70">Open a folder to see git info</p>
           </div>
         </SidebarGroupContent>
       </>
@@ -164,10 +166,10 @@ export function SidebarGitTab() {
           <SidebarGroupLabel className="mb-0">Git</SidebarGroupLabel>
         </div>
         <SidebarGroupContent className="relative overflow-hidden h-full">
-          <div className="mt-2 flex flex-col items-center justify-center h-full px-2 text-center text-muted-foreground">
-            <IconGitBranch className="h-8 w-8 mb-2" />
-            <p className="mb-2">Not a git repository</p>
-            <p className="text-xs">Initialize git in this folder to see git information</p>
+          <div className="flex flex-col items-center justify-center h-full px-4 text-center text-muted-foreground">
+            <IconGitBranch className="h-6 w-6 mb-2" />
+            <p className="text-xs mb-1">Not a git repository</p>
+            <p className="text-[10px] text-muted-foreground/70">Initialize git to see info</p>
           </div>
         </SidebarGroupContent>
       </>
@@ -192,54 +194,49 @@ export function SidebarGitTab() {
       </div>
 
       <SidebarGroupContent className="relative overflow-hidden h-full">
-        <ScrollArea className="absolute inset-0 w-full h-full max-h-[calc(100vh-100px)]" type="auto" scrollHideDelay={400}>
-          <div className="space-y-4 p-2">
+        <ScrollArea className="h-full w-full max-h-[calc(100vh-50px)]" type="auto" scrollHideDelay={400}>
+          <div className="space-y-3 p-2">
             {error && (
-              <div className="flex items-center gap-2 p-2 rounded-md bg-destructive/10 text-destructive text-sm">
-                <IconAlertCircle className="h-4 w-4" />
-                <span className="flex-1">{error}</span>
+              <div className="flex items-center gap-2 p-2 rounded-md bg-destructive/10 text-destructive text-xs">
+                <IconAlertCircle className="h-3 w-3 shrink-0" />
+                <span className="flex-1 text-[10px]">{error}</span>
               </div>
             )}
 
-            {/* Current Branch Status */}
             {status && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 p-2 rounded-md bg-sidebar-accent/20">
-                  <IconGitBranch className="h-4 w-4 text-blue-500" />
-                  <span className="font-medium text-sm">
+              <div className="px-2 py-2 rounded-md bg-sidebar-accent/20">
+                <div className="flex items-center gap-2">
+                  <IconGitBranch className="h-3 w-3 text-blue-500 shrink-0" />
+                  <span className="font-medium text-xs truncate" title={status.current_branch || 'HEAD detached'}>
                     {status.current_branch || 'HEAD detached'}
                   </span>
                   {status.has_changes && (
-                    <Badge variant="outline" className="text-xs">
-                      changes
+                    <Badge variant="outline" className="text-[10px] px-1 py-0">
+                      •
                     </Badge>
                   )}
                 </div>
               </div>
             )}
 
-            {/* Branches Section */}
             <Collapsible open={isBranchesOpen} onOpenChange={setIsBranchesOpen}>
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-sidebar-accent/50 rounded-md">
-                <div className="flex items-center gap-2">
+              <CollapsibleTrigger className="flex items-center justify-between w-full px-2 py-1 hover:bg-sidebar-accent/50 rounded">
+                <div className="flex items-center gap-1.5">
                   {isBranchesOpen ? (
-                    <IconChevronDown className="h-4 w-4" />
+                    <IconChevronDown className="h-3 w-3" />
                   ) : (
-                    <IconChevronRight className="h-4 w-4" />
+                    <IconChevronRight className="h-3 w-3" />
                   )}
-                  <span className="font-medium text-sm">Branches</span>
-                  <Badge variant="secondary" className="text-xs">
+                  <span className="font-medium text-xs">Branches</span>
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                     {branches.length}
                   </Badge>
                 </div>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="space-y-1 ml-2 mt-2 max-w-62">
+                <div className="mt-1">
                   {localBranches.length > 0 && (
-                    <div className="space-y-1">
-                      <div className="text-xs text-muted-foreground font-medium px-2">
-                        LOCAL ({localBranches.length})
-                      </div>
+                    <div className="space-y-0.5">
                       {localBranches.map((branch) => (
                         <BranchItem key={branch.name} branch={branch} />
                       ))}
@@ -247,11 +244,7 @@ export function SidebarGitTab() {
                   )}
                   
                   {remoteBranches.length > 0 && (
-                    <div className="space-y-1">
-                      {localBranches.length > 0 && <Separator className="my-2" />}
-                      <div className="text-xs text-muted-foreground font-medium px-2">
-                        REMOTE ({remoteBranches.length})
-                      </div>
+                    <div className="space-y-0.5 mt-2">
                       {remoteBranches.map((branch) => (
                         <BranchItem key={branch.name} branch={branch} />
                       ))}
@@ -261,29 +254,28 @@ export function SidebarGitTab() {
               </CollapsibleContent>
             </Collapsible>
 
-            {/* Commits Section */}
             <Collapsible open={isCommitsOpen} onOpenChange={setIsCommitsOpen}>
-              <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-sidebar-accent/50 rounded-md">
-                <div className="flex items-center gap-2">
+              <CollapsibleTrigger className="flex items-center justify-between w-full px-2 py-1 hover:bg-sidebar-accent/50 rounded">
+                <div className="flex items-center gap-1.5">
                   {isCommitsOpen ? (
-                    <IconChevronDown className="h-4 w-4" />
+                    <IconChevronDown className="h-3 w-3" />
                   ) : (
-                    <IconChevronRight className="h-4 w-4" />
+                    <IconChevronRight className="h-3 w-3" />
                   )}
-                  <span className="font-medium text-sm">Commits</span>
-                  <Badge variant="secondary" className="text-xs">
+                  <span className="font-medium text-xs">Commits</span>
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                     {commits.length}
                   </Badge>
                 </div>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="ml-2 mt-2">
+                <div className="mt-1">
                   {commits.length > 0 ? (
                     commits.map((commit) => (
                       <CommitItem key={commit.id} commit={commit} />
                     ))
                   ) : (
-                    <div className="text-center text-muted-foreground text-sm py-4">
+                    <div className="text-center text-muted-foreground text-xs py-4">
                       No commits found
                     </div>
                   )}
