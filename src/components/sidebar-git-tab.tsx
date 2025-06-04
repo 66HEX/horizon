@@ -23,7 +23,8 @@ import {
   IconPlusMinus,
   IconCloudUp,
   IconCloudDown,
-  IconCloud
+  IconCloud,
+  IconX
 } from "@tabler/icons-react";
 import { useGitStore, GitBranch, GitCommit, GitFileStatus } from "@/lib/stores/git-store";
 import { useFileContext } from "@/lib/file-context";
@@ -173,7 +174,8 @@ export function SidebarGitTab() {
     fetchFromRemote,
     pullFromRemote,
     pushToRemote,
-    clearError
+    clearError,
+    discardAllChanges
   } = useGitStore();
 
   const [isBranchesOpen, setIsBranchesOpen] = useState(false);
@@ -262,15 +264,20 @@ export function SidebarGitTab() {
   };
 
   const handlePush = async () => {
-    if (currentDirectory) {
-      try {
-        const result = await pushToRemote(currentDirectory);
-        if (result.success) {
-          await refreshGitData(currentDirectory);
-        }
-      } catch (error) {
-        console.error('Failed to push:', error);
-      }
+    if (!currentDirectory) return;
+    try {
+      await pushToRemote(currentDirectory);
+    } catch (error) {
+      console.error('Failed to push:', error);
+    }
+  };
+
+  const handleDiscardAll = async () => {
+    if (!currentDirectory) return;
+    try {
+      await discardAllChanges(currentDirectory);
+    } catch (error) {
+      console.error('Failed to discard changes:', error);
     }
   };
 
@@ -351,7 +358,6 @@ export function SidebarGitTab() {
               </div>
             )}
 
-            {/* Commit Section */}
             <div className="space-y-2 px-2">
               <Input
                 placeholder={
@@ -375,7 +381,6 @@ export function SidebarGitTab() {
               </Button>
             </div>
 
-            {/* Remote Status & Actions */}
             {remoteStatus && remoteStatus.has_remote && (
               <div className="space-y-2">
                 <div className="px-2 py-2 rounded-md bg-sidebar-accent/10">
@@ -438,7 +443,6 @@ export function SidebarGitTab() {
               </div>
             )}
 
-            {/* Branches Section */}
             <Collapsible open={isBranchesOpen} onOpenChange={setIsBranchesOpen}>
               <CollapsibleTrigger className="flex items-center justify-between w-full px-2 py-1 hover:bg-sidebar-accent/50 rounded">
                 <div className="flex items-center gap-1.5">
@@ -488,17 +492,32 @@ export function SidebarGitTab() {
                       {changes.unstaged.length}
                     </Badge>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-4 w-4 p-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleStageAll();
-                    }}
-                  >
-                    <IconPlus className="h-3 w-3" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-4 w-4 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleStageAll();
+                      }}
+                      title="Stage all changes"
+                    >
+                      <IconPlus className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-4 w-4 p-0 text-destructive hover:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDiscardAll();
+                      }}
+                      title="Discard all changes"
+                    >
+                      <IconX className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <div className="mt-1 space-y-0.5">
@@ -517,7 +536,6 @@ export function SidebarGitTab() {
               </Collapsible>
             )}
 
-            {/* Staged Changes Section */}
             {changes && changes.staged.length > 0 && (
               <Collapsible open={isStagedOpen} onOpenChange={setIsStagedOpen}>
                 <CollapsibleTrigger className="flex items-center justify-between w-full p-2 py-1 hover:bg-sidebar-accent/50 rounded">
@@ -550,7 +568,6 @@ export function SidebarGitTab() {
               </Collapsible>
             )}
 
-            {/* Commits Section */}
             <Collapsible open={isCommitsOpen} onOpenChange={setIsCommitsOpen}>
               <CollapsibleTrigger className="flex items-center justify-between w-full px-2 py-1 hover:bg-sidebar-accent/50 rounded">
                 <div className="flex items-center gap-1.5">

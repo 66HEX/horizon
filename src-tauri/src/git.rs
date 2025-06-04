@@ -476,7 +476,6 @@ pub fn pull_from_remote(repo_path: String, remote_name: Option<String>) -> Resul
     }
     
     // Perform merge
-    let mut index = repo.index().map_err(|e| e.to_string())?;
     let local_tree = local_commit.tree().map_err(|e| e.to_string())?;
     let remote_tree = remote_commit.tree().map_err(|e| e.to_string())?;
     
@@ -549,7 +548,7 @@ pub fn pull_from_remote(repo_path: String, remote_name: Option<String>) -> Resul
         let signature = repo.signature().map_err(|e| e.to_string())?;
         let message = format!("Merge remote-tracking branch '{}/{}'", remote_name, current_branch_name);
         
-        let merge_commit = repo.commit(
+        let _merge_commit = repo.commit(
             Some("HEAD"),
             &signature,
             &signature,
@@ -625,4 +624,36 @@ pub fn push_to_remote(repo_path: String, remote_name: Option<String>) -> Result<
             pushed_commits: 0,
         })
     }
+}
+
+#[command]
+pub fn discard_all_changes(repo_path: String) -> Result<String, String> {
+    let repo = Repository::open(&repo_path).map_err(|e| e.to_string())?;
+    
+    // Get the current HEAD commit
+    let head = repo.head().map_err(|e| e.to_string())?;
+    let head_commit = head.peel_to_commit().map_err(|e| e.to_string())?;
+    let head_tree = head_commit.tree().map_err(|e| e.to_string())?;
+    
+    // Create checkout builder with force option to overwrite working directory
+    let mut checkout_builder = git2::build::CheckoutBuilder::new();
+    checkout_builder.force(); // Force checkout to overwrite modified files
+    checkout_builder.remove_untracked(true); // Remove untracked files
+    
+    // Checkout HEAD tree to working directory (discard all changes)
+    repo.checkout_tree(head_tree.as_object(), Some(&mut checkout_builder))
+        .map_err(|e| e.to_string())?;
+    
+    // Reset the index to match HEAD (unstage any staged changes)
+    let mut index = repo.index().map_err(|e| e.to_string())?;
+    index.read_tree(&head_tree).map_err(|e| e.to_string())?;
+    index.write().map_err(|e| e.to_string())?;
+    
+    // Count how many files were affected
+    let statuses_before = repo.statuses(Some(&mut git2::StatusOptions::new()))
+        .map_err(|e| e.to_string())?;
+    
+    let files_count = statuses_before.len();
+    
+    Ok(format!("Discarded changes in {} files", files_count))
 } 

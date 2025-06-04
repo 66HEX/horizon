@@ -91,6 +91,8 @@ interface GitStore {
   pushToRemote: (repoPath: string, remoteName?: string) => Promise<GitPushResult>;
   
   clearError: () => void;
+
+  discardAllChanges: (repoPath: string) => Promise<void>;
 }
 
 export const useGitStore = create<GitStore>((set, get) => ({
@@ -304,6 +306,24 @@ export const useGitStore = create<GitStore>((set, get) => ({
         isLoading: false 
       });
       throw error;
+    }
+  },
+
+  discardAllChanges: async (repoPath: string) => {
+    try {
+      set({ isLoading: true, error: null });
+      const result = await invoke<string>('discard_all_changes', { repoPath });
+      console.log('Discard result:', result);
+      
+      // Refresh git data after discarding changes
+      await get().fetchGitStatus(repoPath);
+      await get().fetchChanges(repoPath);
+      set({ isLoading: false });
+    } catch (error) {
+      set({ 
+        error: error instanceof Error ? error.message : 'Failed to discard changes',
+        isLoading: false 
+      });
     }
   },
 

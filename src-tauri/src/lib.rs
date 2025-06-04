@@ -73,7 +73,8 @@ pub fn run() {
             git::get_remote_status,
             git::fetch_from_remote,
             git::pull_from_remote,
-            git::push_to_remote
+            git::push_to_remote,
+            git::discard_all_changes
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
