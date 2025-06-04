@@ -8,6 +8,8 @@
     "opener:default",
     "core:image:allow-from-path",
     "core:image:allow-size",
+    "core:window:default",
+    "core:window:allow-start-dragging",
     "fs:read-all",
     "fs:read-files",
     "fs:write-files",
@@ -71,15 +73,11 @@
     },
     {
       "identifier": "shell:allow-stdin-write",
-      "allow": [
-        { "name": "terminal-stdin" }
-      ]
+      "allow": [{ "name": "terminal-stdin" }]
     },
     {
       "identifier": "shell:allow-kill",
-      "allow": [
-        { "name": "terminal-kill" }
-      ]
+      "allow": [{ "name": "terminal-kill" }]
     },
     {
       "identifier": "fs:scope",

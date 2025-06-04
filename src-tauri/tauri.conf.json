@@ -12,12 +12,14 @@
   "app": {
     "windows": [
       {
-        "title": "horizon",
+        "hiddenTitle": true,
+        "titleBarStyle": "Overlay",
         "width": 1200,
         "height": 800,
         "minWidth": 800,
         "minHeight": 600,
-        "resizable": true      }
+        "resizable": true
+      }
     ],
     "security": {
       "csp": null,
