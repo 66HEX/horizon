@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
 import { 
   IconGitBranch, 
   IconGitCommit, 
@@ -13,9 +14,15 @@ import {
   IconFolder,
   IconAlertCircle,
   IconUser,
-  IconCalendar
+  IconCalendar,
+  IconPlus,
+  IconMinus,
+  IconFileText,
+  IconEdit,
+  IconTrash,
+  IconPlusMinus
 } from "@tabler/icons-react";
-import { useGitStore, GitBranch, GitCommit } from "@/lib/stores/git-store";
+import { useGitStore, GitBranch, GitCommit, GitFileStatus } from "@/lib/stores/git-store";
 import { useFileContext } from "@/lib/file-context";
 
 interface BranchItemProps {
@@ -45,6 +52,47 @@ function BranchItem({ branch }: BranchItemProps) {
   );
 }
 
+interface FileStatusItemProps {
+  file: GitFileStatus;
+  repoPath: string;
+  isStaged: boolean;
+  onStage: (filePath: string) => void;
+  onUnstage: (filePath: string) => void;
+}
+
+function FileStatusItem({ file, isStaged, onStage, onUnstage }: FileStatusItemProps) {
+  const getStatusIcon = () => {
+    switch (file.status) {
+      case 'modified': return <IconEdit className="h-3 w-3 text-orange-500" />;
+      case 'added': return <IconPlus className="h-3 w-3 text-green-500" />;
+      case 'deleted': return <IconTrash className="h-3 w-3 text-red-500" />;
+      case 'renamed': return <IconPlusMinus className="h-3 w-3 text-blue-500" />;
+      default: return <IconFileText className="h-3 w-3 text-blue-500" />;
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-1 rounded text-xs hover:bg-sidebar-accent/50 group">
+      {getStatusIcon()}
+      <span className="flex-1 truncate text-xs max-w-48" title={file.path}>
+        {file.path}
+      </span>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 shrink-0"
+        onClick={() => isStaged ? onUnstage(file.path) : onStage(file.path)}
+      >
+        {isStaged ? (
+          <IconMinus className="h-3 w-3" />
+        ) : (
+          <IconPlus className="h-3 w-3" />
+        )}
+      </Button>
+    </div>
+  );
+}
+
 interface CommitItemProps {
   commit: GitCommit;
 }
@@ -66,7 +114,7 @@ function CommitItem({ commit }: CommitItemProps) {
   return (
     <div className="px-2 py-1">
       <div 
-        className="flex items-start gap-1.5 p-1.5 pb-3 rounded text-xs hover:bg-sidebar-accent/50 cursor-pointer"
+        className="flex items-start gap-1.5 p-1.5 rounded text-xs hover:bg-sidebar-accent/50 cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <IconGitCommit className="h-3 w-3 text-muted-foreground mt-0.5 shrink-0" />
@@ -108,16 +156,26 @@ export function SidebarGitTab() {
   const { 
     status, 
     branches, 
-    commits, 
+    commits,
+    changes,
     isLoading, 
     error,
     refreshGitData,
     isGitRepository,
+    stageFile,
+    unstageFile,
+    stageAllFiles,
+    commitChanges,
     clearError
   } = useGitStore();
 
-  const [isBranchesOpen, setIsBranchesOpen] = useState(true);
-  const [isCommitsOpen, setIsCommitsOpen] = useState(true);
+  const [isBranchesOpen, setIsBranchesOpen] = useState(false);
+  const [isCommitsOpen, setIsCommitsOpen] = useState(false);
+  const [isChangesOpen, setIsChangesOpen] = useState(false);
+  const [isStagedOpen, setIsStagedOpen] = useState(false);
+  const [commitMessage, setCommitMessage] = useState("");
+  const [authorName, setAuthorName] = useState("Your Name");
+  const [authorEmail, setAuthorEmail] = useState("your.email@example.com");
 
   const localBranches = useMemo(() => branches.filter(b => !b.is_remote), [branches]);
   const remoteBranches = useMemo(() => branches.filter(b => b.is_remote), [branches]);
@@ -139,6 +197,35 @@ export function SidebarGitTab() {
     if (currentDirectory) {
       clearError();
       await refreshGitData(currentDirectory);
+    }
+  };
+
+  const handleStageFile = async (filePath: string) => {
+    if (currentDirectory) {
+      await stageFile(currentDirectory, filePath);
+    }
+  };
+
+  const handleUnstageFile = async (filePath: string) => {
+    if (currentDirectory) {
+      await unstageFile(currentDirectory, filePath);
+    }
+  };
+
+  const handleStageAll = async () => {
+    if (currentDirectory) {
+      await stageAllFiles(currentDirectory);
+    }
+  };
+
+  const handleCommit = async () => {
+    if (currentDirectory && commitMessage.trim()) {
+      try {
+        await commitChanges(currentDirectory, commitMessage.trim(), authorName, authorEmail);
+        setCommitMessage("");
+      } catch (error) {
+        console.error('Failed to commit:', error);
+      }
     }
   };
 
@@ -219,6 +306,100 @@ export function SidebarGitTab() {
               </div>
             )}
 
+            {changes && changes.unstaged.length > 0 && (
+              <Collapsible open={isChangesOpen} onOpenChange={setIsChangesOpen}>
+                <CollapsibleTrigger className="flex items-center justify-between w-full px-2 py-1 hover:bg-sidebar-accent/50 rounded">
+                  <div className="flex items-center gap-1.5">
+                    {isChangesOpen ? (
+                      <IconChevronDown className="h-3 w-3" />
+                    ) : (
+                      <IconChevronRight className="h-3 w-3" />
+                    )}
+                    <span className="font-medium text-xs">Changes</span>
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                      {changes.unstaged.length}
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-4 w-4 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleStageAll();
+                    }}
+                  >
+                    <IconPlus className="h-3 w-3" />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mt-1 space-y-0.5">
+                    {changes.unstaged.map((file) => (
+                      <FileStatusItem
+                        key={file.path}
+                        file={file}
+                        repoPath={currentDirectory}
+                        isStaged={false}
+                        onStage={handleStageFile}
+                        onUnstage={handleUnstageFile}
+                      />
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
+            {changes && changes.staged.length > 0 && (
+              <Collapsible open={isStagedOpen} onOpenChange={setIsStagedOpen}>
+                <CollapsibleTrigger className="flex items-center justify-between w-full px-2 py-1 hover:bg-sidebar-accent/50 rounded">
+                  <div className="flex items-center gap-1.5">
+                    {isStagedOpen ? (
+                      <IconChevronDown className="h-3 w-3" />
+                    ) : (
+                      <IconChevronRight className="h-3 w-3" />
+                    )}
+                    <span className="font-medium text-xs">Staged Changes</span>
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                      {changes.staged.length}
+                    </Badge>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mt-1 space-y-0.5">
+                    {changes.staged.map((file) => (
+                      <FileStatusItem
+                        key={file.path}
+                        file={file}
+                        repoPath={currentDirectory}
+                        isStaged={true}
+                        onStage={handleStageFile}
+                        onUnstage={handleUnstageFile}
+                      />
+                    ))}
+                  </div>
+                  
+                  {/* Commit Section */}
+                  <div className="mt-3 space-y-2 px-2">
+                    <Input
+                      placeholder="Commit message"
+                      value={commitMessage}
+                      onChange={(e) => setCommitMessage(e.target.value)}
+                      className="text-xs h-7"
+                    />
+                    <Button
+                      onClick={handleCommit}
+                      disabled={!commitMessage.trim() || isLoading}
+                      className="w-full h-7 text-xs"
+                      size="sm"
+                    >
+                      Commit
+                    </Button>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
+            {/* Branches Section */}
             <Collapsible open={isBranchesOpen} onOpenChange={setIsBranchesOpen}>
               <CollapsibleTrigger className="flex items-center justify-between w-full px-2 py-1 hover:bg-sidebar-accent/50 rounded">
                 <div className="flex items-center gap-1.5">
@@ -254,6 +435,7 @@ export function SidebarGitTab() {
               </CollapsibleContent>
             </Collapsible>
 
+            {/* Commits Section */}
             <Collapsible open={isCommitsOpen} onOpenChange={setIsCommitsOpen}>
               <CollapsibleTrigger className="flex items-center justify-between w-full px-2 py-1 hover:bg-sidebar-accent/50 rounded">
                 <div className="flex items-center gap-1.5">

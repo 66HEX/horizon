@@ -64,7 +64,12 @@ pub fn run() {
             git::get_git_status,
             git::get_git_branches,
             git::get_git_commits,
-            git::is_git_repository
+            git::is_git_repository,
+            git::get_git_changes,
+            git::stage_file,
+            git::unstage_file,
+            git::stage_all_files,
+            git::commit_changes
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
