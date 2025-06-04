@@ -20,7 +20,10 @@ import {
   IconFileText,
   IconEdit,
   IconTrash,
-  IconPlusMinus
+  IconPlusMinus,
+  IconCloudUp,
+  IconCloudDown,
+  IconCloud
 } from "@tabler/icons-react";
 import { useGitStore, GitBranch, GitCommit, GitFileStatus } from "@/lib/stores/git-store";
 import { useFileContext } from "@/lib/file-context";
@@ -72,7 +75,7 @@ function FileStatusItem({ file, isStaged, onStage, onUnstage }: FileStatusItemPr
   };
 
   return (
-    <div className="flex items-center gap-1.5 px-2 py-1 rounded text-xs hover:bg-sidebar-accent/50 group">
+    <div className="flex justify-between items-center gap-1.5 p-2 py-1 rounded text-xs hover:bg-sidebar-accent/50 group">
       {getStatusIcon()}
       <span className="flex-1 truncate text-xs max-w-48" title={file.path}>
         {file.path}
@@ -158,6 +161,7 @@ export function SidebarGitTab() {
     branches, 
     commits,
     changes,
+    remoteStatus,
     isLoading, 
     error,
     refreshGitData,
@@ -166,6 +170,9 @@ export function SidebarGitTab() {
     unstageFile,
     stageAllFiles,
     commitChanges,
+    fetchFromRemote,
+    pullFromRemote,
+    pushToRemote,
     clearError
   } = useGitStore();
 
@@ -225,6 +232,44 @@ export function SidebarGitTab() {
         setCommitMessage("");
       } catch (error) {
         console.error('Failed to commit:', error);
+      }
+    }
+  };
+
+  const handleFetch = async () => {
+    if (currentDirectory) {
+      try {
+        await fetchFromRemote(currentDirectory);
+        await refreshGitData(currentDirectory);
+      } catch (error) {
+        console.error('Failed to fetch:', error);
+      }
+    }
+  };
+
+  const handlePull = async () => {
+    if (currentDirectory) {
+      try {
+        const result = await pullFromRemote(currentDirectory);
+        if (result.conflicts.length > 0) {
+          console.warn('Pull completed with conflicts:', result.conflicts);
+        }
+        await refreshGitData(currentDirectory);
+      } catch (error) {
+        console.error('Failed to pull:', error);
+      }
+    }
+  };
+
+  const handlePush = async () => {
+    if (currentDirectory) {
+      try {
+        const result = await pushToRemote(currentDirectory);
+        if (result.success) {
+          await refreshGitData(currentDirectory);
+        }
+      } catch (error) {
+        console.error('Failed to push:', error);
       }
     }
   };
@@ -291,7 +336,7 @@ export function SidebarGitTab() {
             )}
 
             {status && (
-              <div className="px-2 py-2 rounded-md bg-sidebar-accent/20">
+              <div className="px-2 py-2 rounded-md bg-sidebar-accent/20 mx-2">
                 <div className="flex items-center gap-2">
                   <IconGitBranch className="h-3 w-3 text-blue-500 shrink-0" />
                   <span className="font-medium text-xs truncate" title={status.current_branch || 'HEAD detached'}>
@@ -305,6 +350,129 @@ export function SidebarGitTab() {
                 </div>
               </div>
             )}
+
+            {/* Commit Section */}
+            <div className="space-y-2 px-2">
+              <Input
+                placeholder={
+                  changes?.staged.length === 0 
+                    ? "Stage changes to commit" 
+                    : "Commit message"
+                }
+                value={commitMessage}
+                onChange={(e) => setCommitMessage(e.target.value)}
+                disabled={changes?.staged.length === 0}
+                className="text-xs h-7"
+              />
+              <Button
+                onClick={handleCommit}
+                disabled={!commitMessage.trim() || isLoading || changes?.staged.length === 0}
+                className="w-full h-7 text-xs"
+                size="sm"
+              >
+                <IconGitCommit className="h-3 w-3 mr-1" />
+                Commit {changes?.staged.length ? `(${changes.staged.length})` : ''}
+              </Button>
+            </div>
+
+            {/* Remote Status & Actions */}
+            {remoteStatus && remoteStatus.has_remote && (
+              <div className="space-y-2">
+                <div className="px-2 py-2 rounded-md bg-sidebar-accent/10">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <IconCloud className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <span className="text-xs font-medium truncate" title={remoteStatus.remote_url || ''}>
+                        {remoteStatus.remote_name}
+                      </span>
+                    </div>
+                    {(remoteStatus.ahead > 0 || remoteStatus.behind > 0) && (
+                      <div className="flex gap-1">
+                        {remoteStatus.ahead > 0 && (
+                          <Badge variant="outline" className="text-[10px] px-1 py-0 text-green-600">
+                            ↑{remoteStatus.ahead}
+                          </Badge>
+                        )}
+                        {remoteStatus.behind > 0 && (
+                          <Badge variant="outline" className="text-[10px] px-1 py-0 text-orange-600">
+                            ↓{remoteStatus.behind}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleFetch}
+                      disabled={isLoading}
+                      className="flex-1 h-6 text-[10px] px-2"
+                    >
+                      <IconCloud className="h-3 w-3 mr-1" />
+                      Fetch
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePull}
+                      disabled={isLoading || remoteStatus.behind === 0}
+                      className="flex-1 h-6 text-[10px] px-2"
+                    >
+                      <IconCloudDown className="h-3 w-3 mr-1" />
+                      Pull
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePush}
+                      disabled={isLoading || remoteStatus.ahead === 0}
+                      className="flex-1 h-6 text-[10px] px-2"
+                    >
+                      <IconCloudUp className="h-3 w-3 mr-1" />
+                      Push
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Branches Section */}
+            <Collapsible open={isBranchesOpen} onOpenChange={setIsBranchesOpen}>
+              <CollapsibleTrigger className="flex items-center justify-between w-full px-2 py-1 hover:bg-sidebar-accent/50 rounded">
+                <div className="flex items-center gap-1.5">
+                  {isBranchesOpen ? (
+                    <IconChevronDown className="h-3 w-3" />
+                  ) : (
+                    <IconChevronRight className="h-3 w-3" />
+                  )}
+                  <span className="font-medium text-xs">Branches</span>
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                    {branches.length}
+                  </Badge>
+                </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="mt-1">
+                  {localBranches.length > 0 && (
+                    <div className="space-y-0.5">
+                      {localBranches.map((branch) => (
+                        <BranchItem key={branch.name} branch={branch} />
+                      ))}
+                    </div>
+                  )}
+                  
+                  {remoteBranches.length > 0 && (
+                    <div className="space-y-0.5 mt-2">
+                      {remoteBranches.map((branch) => (
+                        <BranchItem key={branch.name} branch={branch} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
 
             {changes && changes.unstaged.length > 0 && (
               <Collapsible open={isChangesOpen} onOpenChange={setIsChangesOpen}>
@@ -349,9 +517,10 @@ export function SidebarGitTab() {
               </Collapsible>
             )}
 
+            {/* Staged Changes Section */}
             {changes && changes.staged.length > 0 && (
               <Collapsible open={isStagedOpen} onOpenChange={setIsStagedOpen}>
-                <CollapsibleTrigger className="flex items-center justify-between w-full px-2 py-1 hover:bg-sidebar-accent/50 rounded">
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 py-1 hover:bg-sidebar-accent/50 rounded">
                   <div className="flex items-center gap-1.5">
                     {isStagedOpen ? (
                       <IconChevronDown className="h-3 w-3" />
@@ -377,63 +546,9 @@ export function SidebarGitTab() {
                       />
                     ))}
                   </div>
-                  
-                  {/* Commit Section */}
-                  <div className="mt-3 space-y-2 px-2">
-                    <Input
-                      placeholder="Commit message"
-                      value={commitMessage}
-                      onChange={(e) => setCommitMessage(e.target.value)}
-                      className="text-xs h-7"
-                    />
-                    <Button
-                      onClick={handleCommit}
-                      disabled={!commitMessage.trim() || isLoading}
-                      className="w-full h-7 text-xs"
-                      size="sm"
-                    >
-                      Commit
-                    </Button>
-                  </div>
                 </CollapsibleContent>
               </Collapsible>
             )}
-
-            {/* Branches Section */}
-            <Collapsible open={isBranchesOpen} onOpenChange={setIsBranchesOpen}>
-              <CollapsibleTrigger className="flex items-center justify-between w-full px-2 py-1 hover:bg-sidebar-accent/50 rounded">
-                <div className="flex items-center gap-1.5">
-                  {isBranchesOpen ? (
-                    <IconChevronDown className="h-3 w-3" />
-                  ) : (
-                    <IconChevronRight className="h-3 w-3" />
-                  )}
-                  <span className="font-medium text-xs">Branches</span>
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                    {branches.length}
-                  </Badge>
-                </div>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="mt-1">
-                  {localBranches.length > 0 && (
-                    <div className="space-y-0.5">
-                      {localBranches.map((branch) => (
-                        <BranchItem key={branch.name} branch={branch} />
-                      ))}
-                    </div>
-                  )}
-                  
-                  {remoteBranches.length > 0 && (
-                    <div className="space-y-0.5 mt-2">
-                      {remoteBranches.map((branch) => (
-                        <BranchItem key={branch.name} branch={branch} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
 
             {/* Commits Section */}
             <Collapsible open={isCommitsOpen} onOpenChange={setIsCommitsOpen}>

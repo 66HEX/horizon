@@ -38,11 +38,33 @@ export interface GitChanges {
   unstaged: GitFileStatus[];
 }
 
+export interface GitRemoteStatus {
+  remote_name: string;
+  remote_url: string | null;
+  ahead: number;
+  behind: number;
+  has_remote: boolean;
+}
+
+export interface GitPushResult {
+  success: boolean;
+  message: string;
+  pushed_commits: number;
+}
+
+export interface GitPullResult {
+  success: boolean;
+  message: string;
+  new_commits: number;
+  conflicts: string[];
+}
+
 interface GitStore {
   status: GitStatus | null;
   branches: GitBranch[];
   commits: GitCommit[];
   changes: GitChanges | null;
+  remoteStatus: GitRemoteStatus | null;
   currentPath: string | null;
   isLoading: boolean;
   error: string | null;
@@ -53,6 +75,7 @@ interface GitStore {
   fetchBranches: (path: string) => Promise<void>;
   fetchCommits: (path: string, limit?: number) => Promise<void>;
   fetchChanges: (path: string) => Promise<void>;
+  fetchRemoteStatus: (path: string) => Promise<void>;
   refreshGitData: (path: string) => Promise<void>;
   isGitRepository: (path: string) => Promise<boolean>;
   
@@ -62,6 +85,11 @@ interface GitStore {
   stageAllFiles: (repoPath: string) => Promise<void>;
   commitChanges: (repoPath: string, message: string, authorName: string, authorEmail: string) => Promise<string>;
   
+  // Remote operations
+  fetchFromRemote: (repoPath: string, remoteName?: string) => Promise<string>;
+  pullFromRemote: (repoPath: string, remoteName?: string) => Promise<GitPullResult>;
+  pushToRemote: (repoPath: string, remoteName?: string) => Promise<GitPushResult>;
+  
   clearError: () => void;
 }
 
@@ -70,6 +98,7 @@ export const useGitStore = create<GitStore>((set, get) => ({
   branches: [],
   commits: [],
   changes: null,
+  remoteStatus: null,
   currentPath: null,
   isLoading: false,
   error: null,
@@ -130,13 +159,27 @@ export const useGitStore = create<GitStore>((set, get) => ({
     }
   },
 
+  fetchRemoteStatus: async (path: string) => {
+    try {
+      set({ isLoading: true, error: null });
+      const remoteStatus = await invoke<GitRemoteStatus>('get_remote_status', { repoPath: path });
+      set({ remoteStatus, isLoading: false });
+    } catch (error) {
+      set({ 
+        error: error instanceof Error ? error.message : 'Failed to fetch remote status',
+        isLoading: false 
+      });
+    }
+  },
+
   refreshGitData: async (path: string) => {
-    const { fetchGitStatus, fetchBranches, fetchCommits, fetchChanges } = get();
+    const { fetchGitStatus, fetchBranches, fetchCommits, fetchChanges, fetchRemoteStatus } = get();
     await Promise.all([
       fetchGitStatus(path),
       fetchBranches(path),
       fetchCommits(path),
-      fetchChanges(path)
+      fetchChanges(path),
+      fetchRemoteStatus(path)
     ]);
   },
 
@@ -213,6 +256,51 @@ export const useGitStore = create<GitStore>((set, get) => ({
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Failed to commit changes',
+        isLoading: false 
+      });
+      throw error;
+    }
+  },
+
+  fetchFromRemote: async (repoPath: string, remoteName?: string) => {
+    try {
+      set({ isLoading: true, error: null });
+      const remoteUrl = await invoke<string>('fetch_from_remote', { repoPath, remoteName });
+      set({ isLoading: false });
+      return remoteUrl;
+    } catch (error) {
+      set({ 
+        error: error instanceof Error ? error.message : 'Failed to fetch from remote',
+        isLoading: false 
+      });
+      throw error;
+    }
+  },
+
+  pullFromRemote: async (repoPath: string, remoteName?: string) => {
+    try {
+      set({ isLoading: true, error: null });
+      const pullResult = await invoke<GitPullResult>('pull_from_remote', { repoPath, remoteName });
+      set({ isLoading: false });
+      return pullResult;
+    } catch (error) {
+      set({ 
+        error: error instanceof Error ? error.message : 'Failed to pull from remote',
+        isLoading: false 
+      });
+      throw error;
+    }
+  },
+
+  pushToRemote: async (repoPath: string, remoteName?: string) => {
+    try {
+      set({ isLoading: true, error: null });
+      const pushResult = await invoke<GitPushResult>('push_to_remote', { repoPath, remoteName });
+      set({ isLoading: false });
+      return pushResult;
+    } catch (error) {
+      set({ 
+        error: error instanceof Error ? error.message : 'Failed to push to remote',
         isLoading: false 
       });
       throw error;
